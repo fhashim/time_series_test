@@ -1,0 +1,13 @@
+#Apple/iOS files
+*.DS_Store
+
+# Environments
+venv/
+
+# PyCharm
+.idea/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+
