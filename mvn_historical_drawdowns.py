@@ -34,42 +34,139 @@ Comments:
 
 import pandas as pd
 
+import numpy as np
+
+from dateutil.parser import parse
+
+from dateutil.relativedelta import relativedelta
+
+import re
+
 df = pd.read_csv('Data/time_series.csv')
 df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d')
+
+
+def convert_date(string, fuzzy=False):
+    """
+    Return parsed date if the string can be interpreted as a date.
+
+    :param string: str, string to check for date
+    :param fuzzy: bool, ignore unknown tokens in string if True
+    """
+    try:
+        parse(string, fuzzy=fuzzy)
+        return parse(string, fuzzy=fuzzy)
+
+    except ValueError:
+        return False
+
+
+def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_End='Latest', Rank=1):
+    main_df = df[(df['Asset Code'] == Code) & (df['Price Type'] == Price_Type)]
+
+    chars = set('dDwWmMyY')
+
+    try:
+        if Period_End == 'Latest':
+            end_date = main_df.Date.max()
+        elif any((c in chars) for c in Period_End):
+            end_date = main_df.Date.max()
+            value = int(re.findall(r'\d+', Period_End)[0])
+            if 'D' in Period_End:
+                # end_date = end_date - pd.tseries.frequencies.to_offset(Period_End)
+                end_date = end_date - relativedelta(days=value)
+            elif 'W' in Period_End:
+                end_date = end_date - relativedelta(weeks=value)
+            elif 'M' in Period_End:
+                end_date = end_date - relativedelta(months=value)
+            else:
+                end_date = end_date - relativedelta(years=value)
+        else:
+            end_date = str(parse(Period_End, fuzzy=False))
+
+    except ValueError:
+        raise ValueError("Period End date is not correct")
+
+    # check if price on end date exists
+
+
+    try:
+        if Period_Start == 'Inception':
+            start_date = main_df.Date.min()
+        elif any((c in chars) for c in Period_Start):
+            pass
+        else:
+            start_date = str(parse(Period_Start, fuzzy=False))
+
+    except ValueError:
+        raise ValueError("Period Start date is not correct")
+
+    work_df = pd.DataFrame(index=pd.date_range(start_date, end_date))
+    work_df = work_df.join(main_df.set_index('Date'))
+
+    work_df.ffill(inplace=True)
+    work_df.bfill(inplace=True)
+
+    work_df['Returns'] = work_df['Price'].pct_change()
+    work_df['Cum_Returns'] = (1 + work_df['Returns']).cumprod()
+    work_df['Previous_Peak'] = work_df['Cum_Returns'].cummax()
+
+    # Calculate Drawdown
+    work_df['Drawdown'] = (work_df['Cum_Returns'] - work_df['Previous_Peak']) / work_df['Previous_Peak']
+
+    x = pd.DataFrame(
+        pd.concat([work_df.Cum_Returns, work_df.index.to_series()], axis=1)
+            .agg(tuple, axis=1)
+            .cummax()
+            .to_list(),
+        columns=["Previous_Peak", "Previous_Peak_index"],
+    )
+
+    x[x.isna().any(axis=1)] = np.nan
+
+    g = (
+        x.groupby("Previous_Peak_index")["Previous_Peak_index"]
+            .agg(list)
+            .str[0]
+            .shift(-1)
+    )
+
+    x = x.merge(
+        g, left_on="Previous_Peak_index", right_index=True, how="left"
+    ).rename(
+        columns={
+            "Previous_Peak_index_x": "Previous_Peak_index",
+            "Previous_Peak_index_y": "Next_PP_index",
+        }
+    )
+
+    work_df[["Previous_Peak", "Previous_Peak_index", "Next_PP_index"]] = x.values
+
+    int_df = pd.DataFrame(index=work_df['Previous_Peak_index'])
+    int_df = int_df.join(work_df['Price'])
+    int_df.columns = ['PP_Price']
+
+    work_df['PP_Price'] = int_df['PP_Price'].values
+    work_df['Recovery_Days'] = (work_df['Next_PP_index'] - work_df.index).dt.days
+
+    sorted_df = work_df.sort_values('Drawdown').drop_duplicates('Previous_Peak_index')
+
+    results_df = sorted_df.iloc[:Rank, :]
+
+    drawdown_start = results_df['Previous_Peak_index'].values
+    drawdown_end = results_df.index.values
+    drawdown_performance = results_df['Drawdown'].values
+    recovery_days = results_df['Recovery_Days'].values
+
+    return drawdown_start, drawdown_end, drawdown_performance, recovery_days
+
+
 Period_Start = 'Inception'
-Period_end = 'Latest'
-Asset_Code = 'SPY US'
+Period_End = 'Latest'
+Code = 'SPY US'
 Price_Type = 'GTR'
-Rank = 1
+Rank = 3
 
-main_df = df[(df['Asset Code'] == 'SPY US') & (df['Price Type'] == 'GTR')]
-
-if Period_Start == 'Inception':
-    start_date = main_df.Date.min()
-
-if Period_end == 'Latest':
-    end_date = main_df.Date.max()
-
-work_df = pd.DataFrame(index=pd.date_range(start_date, end_date))
-work_df = work_df.join(main_df.set_index('Date'))
-
-work_df.ffill(inplace=True)
-work_df.bfill(inplace=True)
-
-work_df['Returns'] = work_df['Price'].pct_change()
-work_df['Cum_Returns'] = (1 + work_df['Returns']).cumprod()
-work_df['Previous_Peak'] = work_df['Cum_Returns'].cummax()
-work_df['idxmax'] = work_df['Previous_Peak'].idxmax()
-work_df['Drawdown'] = (work_df['Cum_Returns'] - work_df['Previous_Peak']) / work_df['Previous_Peak']
-
-work_df['Drawdown'].idxmin()
-
-test = pd.DataFrame({'Date': ['2021-01-01', '2021-01-02', '2021-01-03', '2021-01-04', '2021-01-05',
-                              '2021-01-06', '2021-01-07', '2021-01-08', '2021-01-09', '2021-01-10',
-                              '2021-01-11', '2021-01-12', '2021-01-13', '2021-01-14'],
-                     'Price': [1, 1, 5, 3, 4, 3, 2, 5, 6, 4, 3, 2, 1, 7]})
-test['Date'] = pd.to_datetime(test['Date'])
-test.set_index('Date', inplace=True)
-test['Returns'] = test['Price'].pct_change()
-test['Cum_Returns'] = (1 + test['Returns']).cumprod()
-test['Previous_Peak'] = test['Cum_Returns'].cummax()
+drawdown_start, drawdown_end, drawdown_performance, recovery_days = mvn_historical_drawdowns(Code, Price_Type,
+                                                                                             Period_Start, Period_End,
+                                                                                             Rank)
