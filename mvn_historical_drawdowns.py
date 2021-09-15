@@ -1,4 +1,4 @@
-'''
+"""
 Calculate largest historic drawdowns and recovery period post a drawdown for a given portfolio(Can also be used on individual assets)
 
 Function Signature:
@@ -30,7 +30,7 @@ Methodology:
 Comments:
 
 - Period Start/Period End/Rank accept arrays, so multiple drawdowns can be calculated/returned at once
-'''
+"""
 
 import pandas as pd
 
@@ -42,13 +42,16 @@ from dateutil.relativedelta import relativedelta
 
 import re
 
-import quantstats
-
-df = pd.read_csv('Data/time_series.csv')
-df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d')
+from db_connection import create_connection
 
 def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_End='Latest', Rank=1):
-    #create db connection
+    # create db connection and load data
+    sql = ''' 
+        SELECT Date, Asset_Code [Asset Code], Price_Type [Price Type], Price from time_series order by Date ASC
+    '''
+    conn = create_connection()
+    df = pd.read_sql(sql, conn)
+    df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d')
 
     main_df = df[(df['Asset Code'] == Code) & (df['Price Type'] == Price_Type)]
 
@@ -79,7 +82,6 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
     if end_date in main_df.Date.values:
         pass
     else:
-        # end_date = main_df.loc[main_df['Date'] <= end_date, 'Date'].iloc[-1]
         end_date = main_df.loc[main_df['Date'] <= end_date, 'Date'].max()
         print('Period End Date not found in date using last available date i.e. {}'.format(end_date))
 
@@ -108,7 +110,6 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
     if start_date in main_df.Date.values:
         pass
     else:
-        # start_date = main_df.loc[main_df['Date'] <= start_date, 'Date'].iloc[-1]
         start_date = main_df.loc[main_df['Date'] <= start_date, 'Date'].max()
         print('Period Start Date not found in date using last available date i.e. {}'.format(start_date))
 
@@ -158,7 +159,7 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
     int_df.columns = ['PP_Price']
 
     work_df['PP_Price'] = int_df['PP_Price'].values
-    work_df['Recovery_Days'] = (work_df['Next_PP_index'] - work_df.index).dt.days
+    work_df['Recovery_Days'] = (work_df['Next_PP_index'] - work_df.index).dt.days - 1
 
     sorted_df = work_df.sort_values('Drawdown').drop_duplicates('Previous_Peak_index')
 
@@ -170,22 +171,4 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
     recovery_days = results_df['Recovery_Days'].values
 
 
-    return drawdown_start, drawdown_end, drawdown_performance, recovery_days, work_df, results_df
-
-
-Period_Start = 'Inception'
-Period_End = 'Latest'
-# Period_Start = '2D'
-# Period_End = '23rd Aug 21'
-Code = 'SPY US'
-Price_Type = 'GTR'
-Rank = 3
-
-drawdown_start, drawdown_end, drawdown_performance, recovery_days, returns, results = mvn_historical_drawdowns(Code, Price_Type,
-                                                                                             Period_Start, Period_End,
-                                                                                             Rank)
-returns_df = returns['Returns']
-returns.index = returns.index.tz_convert(None)
-
-quantstats.reports.html(returns_df, output='Results.html',
-                        title="Results")
+    return drawdown_start, drawdown_end, drawdown_performance, recovery_days
