@@ -42,30 +42,19 @@ from dateutil.relativedelta import relativedelta
 
 import re
 
+import quantstats
+
 df = pd.read_csv('Data/time_series.csv')
 df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d')
 
-
-def convert_date(string, fuzzy=False):
-    """
-    Return parsed date if the string can be interpreted as a date.
-
-    :param string: str, string to check for date
-    :param fuzzy: bool, ignore unknown tokens in string if True
-    """
-    try:
-        parse(string, fuzzy=fuzzy)
-        return parse(string, fuzzy=fuzzy)
-
-    except ValueError:
-        return False
-
-
 def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_End='Latest', Rank=1):
+    #create db connection
+
     main_df = df[(df['Asset Code'] == Code) & (df['Price Type'] == Price_Type)]
 
-    chars = set('dDwWmMyY')
+    chars = set('DWMY')
 
+    # Parse and deal with Period End Date as Period Start depends on Period End
     try:
         if Period_End == 'Latest':
             end_date = main_df.Date.max()
@@ -73,7 +62,6 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
             end_date = main_df.Date.max()
             value = int(re.findall(r'\d+', Period_End)[0])
             if 'D' in Period_End:
-                # end_date = end_date - pd.tseries.frequencies.to_offset(Period_End)
                 end_date = end_date - relativedelta(days=value)
             elif 'W' in Period_End:
                 end_date = end_date - relativedelta(weeks=value)
@@ -88,18 +76,41 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
         raise ValueError("Period End date is not correct")
 
     # check if price on end date exists
+    if end_date in main_df.Date.values:
+        pass
+    else:
+        # end_date = main_df.loc[main_df['Date'] <= end_date, 'Date'].iloc[-1]
+        end_date = main_df.loc[main_df['Date'] <= end_date, 'Date'].max()
+        print('Period End Date not found in date using last available date i.e. {}'.format(end_date))
 
-
+    # Parse and deal with Period Start Date
     try:
         if Period_Start == 'Inception':
             start_date = main_df.Date.min()
         elif any((c in chars) for c in Period_Start):
-            pass
+            start_date = end_date
+            value = int(re.findall(r'\d+', Period_Start)[0])
+            if 'D' in Period_Start:
+                start_date = start_date - relativedelta(days=value)
+            elif 'W' in Period_Start:
+                start_date = start_date - relativedelta(weeks=value)
+            elif 'M' in Period_Start:
+                start_date = start_date - relativedelta(months=value)
+            else:
+                start_date = start_date - relativedelta(years=value)
         else:
             start_date = str(parse(Period_Start, fuzzy=False))
 
     except ValueError:
         raise ValueError("Period Start date is not correct")
+
+    # check if price on start date exists
+    if start_date in main_df.Date.values:
+        pass
+    else:
+        # start_date = main_df.loc[main_df['Date'] <= start_date, 'Date'].iloc[-1]
+        start_date = main_df.loc[main_df['Date'] <= start_date, 'Date'].max()
+        print('Period Start Date not found in date using last available date i.e. {}'.format(start_date))
 
     work_df = pd.DataFrame(index=pd.date_range(start_date, end_date))
     work_df = work_df.join(main_df.set_index('Date'))
@@ -158,15 +169,23 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
     drawdown_performance = results_df['Drawdown'].values
     recovery_days = results_df['Recovery_Days'].values
 
-    return drawdown_start, drawdown_end, drawdown_performance, recovery_days
+
+    return drawdown_start, drawdown_end, drawdown_performance, recovery_days, work_df, results_df
 
 
 Period_Start = 'Inception'
 Period_End = 'Latest'
+# Period_Start = '2D'
+# Period_End = '23rd Aug 21'
 Code = 'SPY US'
 Price_Type = 'GTR'
 Rank = 3
 
-drawdown_start, drawdown_end, drawdown_performance, recovery_days = mvn_historical_drawdowns(Code, Price_Type,
+drawdown_start, drawdown_end, drawdown_performance, recovery_days, returns, results = mvn_historical_drawdowns(Code, Price_Type,
                                                                                              Period_Start, Period_End,
                                                                                              Rank)
+returns_df = returns['Returns']
+returns.index = returns.index.tz_convert(None)
+
+quantstats.reports.html(returns_df, output='Results.html',
+                        title="Results")
