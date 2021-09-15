@@ -10,4 +10,8 @@ venv/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 
+# Test Files
+mvn_historical_drawdowns_arch.py
+test.py
+
 
