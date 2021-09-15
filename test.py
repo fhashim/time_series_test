@@ -10,20 +10,19 @@ test['Returns'] = test['Price'].pct_change()
 test['Cum_Returns'] = (1 + test['Returns']).cumprod()
 test['Previous_Peak'] = test['Cum_Returns'].cummax()
 
-
 x = pd.DataFrame(
     pd.concat([test.Cum_Returns, test.index.to_series()], axis=1)
-    .agg(tuple, axis=1)
-    .cummax()
-    .to_list(),
+        .agg(tuple, axis=1)
+        .cummax()
+        .to_list(),
     columns=["Previous_Peak", "Previous_Peak_index"],
 )
 x[x.isna().any(axis=1)] = np.nan
 g = (
     x.groupby("Previous_Peak_index")["Previous_Peak_index"]
-    .agg(list)
-    .str[0]
-    .shift(-1)
+        .agg(list)
+        .str[0]
+        .shift(-1)
 )
 x = x.merge(
     g, left_on="Previous_Peak_index", right_index=True, how="left"
@@ -35,8 +34,6 @@ x = x.merge(
 )
 test[["Previous_Peak", "Previous_Peak_index", "Next_PP_index"]] = x.values
 print(test)
-
-
 
 ### All work
 main_df = df[(df['Asset Code'] == 'SPY US') & (df['Price Type'] == 'GTR')]
@@ -59,12 +56,11 @@ work_df['Previous_Peak'] = work_df['Cum_Returns'].cummax()
 # work_df['idxmax'] = work_df['Previous_Peak'].idxmax()
 work_df['Drawdown'] = (work_df['Cum_Returns'] - work_df['Previous_Peak']) / work_df['Previous_Peak']
 
-
 x = pd.DataFrame(
     pd.concat([work_df.Cum_Returns, work_df.index.to_series()], axis=1)
-    .agg(tuple, axis=1)
-    .cummax()
-    .to_list(),
+        .agg(tuple, axis=1)
+        .cummax()
+        .to_list(),
     columns=["Previous_Peak", "Previous_Peak_index"],
 )
 
@@ -72,9 +68,9 @@ x[x.isna().any(axis=1)] = np.nan
 
 g = (
     x.groupby("Previous_Peak_index")["Previous_Peak_index"]
-    .agg(list)
-    .str[0]
-    .shift(-1)
+        .agg(list)
+        .str[0]
+        .shift(-1)
 )
 
 x = x.merge(
@@ -110,8 +106,7 @@ work_df.to_csv('work_df2.csv')
 
 work_df.sort_values('Drawdown').drop_duplicates('Previous_Peak_index')
 groupby_obj = work_df.groupby('Previous_Peak_index')
-groupby_obj.nsmallest(3,'Drawdown')
-
+groupby_obj.nsmallest(3, 'Drawdown')
 
 Period_End = '1Y'
 chars = set('MDWY')
@@ -130,5 +125,17 @@ except ValueError:
 
 print(end_date)
 
-
 int(filter(str.isdigit, Period_End))
+
+###
+
+test = pd.DataFrame({'Date': ['2021-01-01', '2021-01-02', '2021-01-03', '2021-01-05', '2021-01-08', '2021-01-09'],
+                   'Price': [10, 20, 30, 40, 20, 10]})
+test['Date'] = pd.to_datetime(test['Date'])
+
+end_dates = ['2021-01-01', '2021-01-06', '2021-01-07', '2021-01-09']
+
+for end_date in end_dates:
+    print('End Date: {}'.format(end_date))
+    end_date = test.loc[test['Date'] <= end_date, 'Date'].iloc[-1]
+    print('Updated End Date: {}'.format(end_date))
