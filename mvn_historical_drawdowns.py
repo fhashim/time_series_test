@@ -44,9 +44,10 @@ import re
 
 from db_connection import create_connection
 
+
 def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_End='Latest', Rank=1):
     # create db connection and load data
-    sql = ''' 
+    sql = '''
         SELECT Date, Asset_Code [Asset Code], Price_Type [Price Type], Price from time_series order by Date ASC
     '''
     conn = create_connection()
@@ -159,16 +160,23 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
     int_df.columns = ['PP_Price']
 
     work_df['PP_Price'] = int_df['PP_Price'].values
-    work_df['Recovery_Days'] = (work_df['Next_PP_index'] - work_df.index).dt.days - 1
+    work_df['Recovery_Days'] = (work_df['Next_PP_index'] - work_df.index).dt.days
 
     sorted_df = work_df.sort_values('Drawdown').drop_duplicates('Previous_Peak_index')
 
     results_df = sorted_df.iloc[:Rank, :]
+    results_df['Previous_Peak_index'] = results_df['Previous_Peak_index'] + np.timedelta64(1, 'D')
 
     drawdown_start = results_df['Previous_Peak_index'].values
     drawdown_end = results_df.index.values
-    drawdown_performance = results_df['Drawdown'].values
-    recovery_days = results_df['Recovery_Days'].values
-
+    drawdown_performance = np.round(results_df['Drawdown'].values, 4)
+    recovery_days = results_df['Recovery_Days'].astype(int, errors="ignore").values
 
     return drawdown_start, drawdown_end, drawdown_performance, recovery_days
+
+
+drawdown_start, drawdown_end, drawdown_performance, recovery_days = \
+    mvn_historical_drawdowns(Code="SPX", Price_Type="PR", Period_Start="20Y", Period_End="20Y", Rank=2)
+
+
+
