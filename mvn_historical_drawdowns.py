@@ -113,8 +113,7 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
     else:
         start_date = main_df.loc[main_df['Date'] <= start_date, 'Date'].max()
         print('Period Start Date not found in date using last available date i.e. {}'.format(start_date))
-
-    work_df = pd.DataFrame(index=pd.date_range(start_date, end_date))
+    work_df = pd.DataFrame(index=pd.date_range(start_date, main_df.Date.max()))
     work_df = work_df.join(main_df.set_index('Date'))
 
     work_df.ffill(inplace=True)
@@ -160,23 +159,25 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
     int_df.columns = ['PP_Price']
 
     work_df['PP_Price'] = int_df['PP_Price'].values
-    work_df['Recovery_Days'] = (work_df['Next_PP_index'] - work_df.index).dt.days
+    work_df['Recovery_Days'] = np.where(pd.isna(work_df['Next_PP_index']),
+                                        -1,
+                                        (work_df['Next_PP_index'] - work_df.index).dt.days)
 
-    sorted_df = work_df.sort_values('Drawdown').drop_duplicates('Previous_Peak_index')
+    sorted_df = work_df[(work_df.index >= start_date) & (work_df.index <= end_date)]
+    sorted_df = sorted_df.sort_values('Drawdown').drop_duplicates('Previous_Peak_index')
 
-    results_df = sorted_df.iloc[:Rank, :]
-    results_df['Previous_Peak_index'] = results_df['Previous_Peak_index'] + np.timedelta64(1, 'D')
+    results_df = sorted_df.iloc[:Rank, :][-1:]
 
-    drawdown_start = results_df['Previous_Peak_index'].values
-    drawdown_end = results_df.index.values
-    drawdown_performance = np.round(results_df['Drawdown'].values, 4)
-    recovery_days = results_df['Recovery_Days'].astype(int, errors="ignore").values
+    drawdown_start = (results_df['Previous_Peak_index'].values)[0].astype(str)
+    drawdown_end = (results_df.index.values)[0].astype(str)
+    drawdown_performance = (np.round(results_df['Drawdown'].values, 6))[0]
+    recovery_days = ((results_df['Recovery_Days'].values).astype(int))[0]
 
-    return drawdown_start, drawdown_end, drawdown_performance, recovery_days
+    return drawdown_start, drawdown_end, drawdown_performance, recovery_days, work_df
 
 
-drawdown_start, drawdown_end, drawdown_performance, recovery_days = \
-    mvn_historical_drawdowns(Code="SPX", Price_Type="PR", Period_Start="20Y", Period_End="20Y", Rank=2)
+drawdown_start, drawdown_end, drawdown_performance, recovery_days, results = \
+    mvn_historical_drawdowns(Code="SPY US", Price_Type="GTR", Period_Start="Inception",  Rank=5)
 
 
 
