@@ -1,99 +1,83 @@
 mvn_historical_drawdowns ("SPY US", "GTR", "Inception", , 1)
-drawdown_start = ['2007-10-10T00:00:00.000000000']
-drawdown_end = ['2009-03-09T00:00:00.000000000']
-Drawdown Performance = [-0.5519]
-Recovery Days = [1256]
+drawdown_start = 2007-10-09T00:00:00.000000000
+drawdown_end = 2009-03-09T00:00:00.000000000
+Drawdown Performance = -0.551891
+Recovery Days = 1256
 
 mvn_historical_drawdowns ("SPY US", "GTR", "Inception", , 2)
-drawdown_start = ['2007-10-10T00:00:00.000000000' '2000-03-27T00:00:00.000000000']
-drawdown_end = ['2009-03-09T00:00:00.000000000' '2002-10-09T00:00:00.000000000']
-Drawdown Performance = [-0.5519 -0.4752]
-Recovery Days = [1256 1478]
+drawdown_start = 2000-03-26T00:00:00.000000000
+drawdown_end = 2002-10-09T00:00:00.000000000
+Drawdown Performance = -0.475153
+Recovery Days = 1478
 
 mvn_historical_drawdowns ("SPY US", "GTR", "Inception", , 3)
-drawdown_start = ['2007-10-10T00:00:00.000000000' '2000-03-27T00:00:00.000000000'
-                    '2020-02-20T00:00:00.000000000']
-drawdown_end = ['2009-03-09T00:00:00.000000000' '2002-10-09T00:00:00.000000000'
-                '2020-03-23T00:00:00.000000000']
-Drawdown Performance = [-0.5519 -0.4752 -0.3372]
-Recovery Days = [1256 1478 140]
+drawdown_start = 2020-02-19T00:00:00.000000000
+drawdown_end = 2020-03-23T00:00:00.000000000
+Drawdown Performance = -0.337174
+Recovery Days = 140
 
 mvn_historical_drawdowns ("SPY US", "GTR", "Inception", , 4)
-drawdown_start = ['2007-10-10T00:00:00.000000000' '2000-03-27T00:00:00.000000000'
-                    '2020-02-20T00:00:00.000000000' '2018-09-21T00:00:00.000000000']
-drawdown_end = ['2009-03-09T00:00:00.000000000' '2002-10-09T00:00:00.000000000'
-                '2020-03-23T00:00:00.000000000' '2018-12-24T00:00:00.000000000']
-Drawdown Performance = [-0.5519 -0.4752 -0.3372 -0.1935]
-Recovery Days = [1256 1478 140 109]
+drawdown_start = 2018-09-20T00:00:00.000000000
+drawdown_end = 2018-12-24T00:00:00.000000000
+Drawdown Performance = -0.193489
+Recovery Days = 109
 
 mvn_historical_drawdowns ("SPY US", "GTR", "Inception", , 5)
-drawdown_start = ['2007-10-10T00:00:00.000000000' '2000-03-27T00:00:00.000000000'
-                    '2020-02-20T00:00:00.000000000' '2018-09-21T00:00:00.000000000'
-                    '1998-07-21T00:00:00.000000000']
-drawdown_end = ['2009-03-09T00:00:00.000000000' '2002-10-09T00:00:00.000000000'
-                '2020-03-23T00:00:00.000000000' '2018-12-24T00:00:00.000000000'
-                '1998-08-31T00:00:00.000000000']
-Drawdown Performance = [-0.5519 -0.4752 -0.3372 -0.1935 -0.1903]
-Recovery Days = [1256 1478 140 109 84]
+drawdown_start = 1998-07-20T00:00:00.000000000
+drawdown_end = 1998-08-31T00:00:00.000000000
+Drawdown Performance = -0.1903
+Recovery Days = 84
 
 mvn_historical_drawdowns ("SPY US", "GTR", "10Y",,1)
-drawdown_start = ['2020-02-20T00:00:00.000000000']
-drawdown_end = ['2020-03-23T00:00:00.000000000]
-Drawdown Performance = [-0.3372]
-Recovery Days = [140]
+drawdown_start = 2020-02-19T00:00:00.000000000
+drawdown_end = 2020-03-23T00:00:00.000000000
+Drawdown Performance = -0.337174
+Recovery Days = 140
 
 mvn_historical_drawdowns ("SPY US", "GTR", "10Y","5Y",1)
-drawdown_start = ['2007-10-10T00:00:00.000000000']
-drawdown_end = ['2009-03-09T00:00:00.000000000']
-Drawdown Performance = [-0.5519]
-Recovery Days = [1256]
+drawdown_start = 2007-10-09T00:00:00.000000000
+drawdown_end = 2009-03-09T00:00:00.000000000
+Drawdown Performance = -0.551891
+Recovery Days = 1256
 
 mvn_historical_drawdowns ("SPX", "PR", "Inception",,1)
-drawdown_start = ['1929-09-17T00:00:00.000000000']
-drawdown_end = ['1932-06-01T00:00:00.000000000']
-Drawdown Performance = [-0.8619]
-Recovery Days = [8148]
+drawdown_start = 1929-09-16T00:00:00.000000000
+drawdown_end = 1932-06-01T00:00:00.000000000
+Drawdown Performance = -0.861896
+Recovery Days = 8148
 
 mvn_historical_drawdowns ("SPX", "PR", "Inception",,2)
-drawdown_start = ['1929-09-17T00:00:00.000000000' '2007-10-10T00:00:00.000000000']
-drawdown_end = ['1932-06-01T00:00:00.000000000' '2009-03-09T00:00:00.000000000']
-Drawdown Performance = [-0.8619 -0.5678]
-Recovery Days = [8148 1480]
+drawdown_start = 2007-10-09T00:00:00.000000000
+drawdown_end = 2009-03-09T00:00:00.000000000
+Drawdown Performance = -0.567754
+Recovery Days = 1480
 
 mvn_historical_drawdowns ("SPX", "PR", "Inception",,3)
-drawdown_start = ['1929-09-17T00:00:00.000000000' '2007-10-10T00:00:00.000000000'
-                    '2000-03-27T00:00:00.000000000']
-drawdown_end = ['1932-06-01T00:00:00.000000000' '2009-03-09T00:00:00.000000000'
-                    '2002-10-09T00:00:00.000000000']
-Drawdown Performance = [-0.8619 -0.5678 -0.4915]
-Recovery Days = [8148 1480 1694]
+drawdown_start = 2000-03-26T00:00:00.000000000
+drawdown_end = 2002-10-09T00:00:00.000000000
+Drawdown Performance = -0.491469
+Recovery Days = 1694
 
 mvn_historical_drawdowns ("SPX", "PR", "Inception",,4)
-drawdown_start = ['1929-09-17T00:00:00.000000000' '2007-10-10T00:00:00.000000000'
-                    '2000-03-27T00:00:00.000000000' '1973-01-12T00:00:00.000000000']
-drawdown_end = ['1932-06-01T00:00:00.000000000' '2009-03-09T00:00:00.000000000'
-                    '2002-10-09T00:00:00.000000000' '1974-10-03T00:00:00.000000000']
-Drawdown Performance = [-0.8619 -0.5678 -0.4915 -0.482]
-Recovery Days = [8148 1480 1694 2114]
+drawdown_start = 1973-01-11T00:00:00.000000000
+drawdown_end = 1974-10-03T00:00:00.000000000
+Drawdown Performance = -0.482036
+Recovery Days = 2114
 
 mvn_historical_drawdowns ("SPX", "PR", "Inception",,5)
-drawdown_start = ['1929-09-17T00:00:00.000000000' '2007-10-10T00:00:00.000000000'
-                    '2000-03-27T00:00:00.000000000' '1973-01-12T00:00:00.000000000'
-                    '1968-12-02T00:00:00.000000000']
-drawdown_end = ['1932-06-01T00:00:00.000000000' '2009-03-09T00:00:00.000000000'
-                    '2002-10-09T00:00:00.000000000' '1974-10-03T00:00:00.000000000'
-                    '1970-05-26T00:00:00.000000000']
-Drawdown Performance = [-0.8619 -0.5678 -0.4915 -0.482  -0.3606]
-Recovery Days = [8148 1480 1694 2114  650]
+drawdown_start = 1968-12-01T00:00:00.000000000
+drawdown_end = 1970-05-26T00:00:00.000000000
+Drawdown Performance = -0.360616
+Recovery Days = 650
 
 mvn_historical_drawdowns ("SPX", "PR", "20Y","20Y",1)
-drawdown_start = ['1987-08-26T00:00:00.000000000']
-drawdown_end = ['1987-12-04T00:00:00.000000000']
-Drawdown Performance = [-0.3351]
-Recovery Days = [600]
+drawdown_start = 1987-08-25T00:00:00.000000000
+drawdown_end = 1987-12-04T00:00:00.000000000
+Drawdown Performance = -0.335095
+Recovery Days = 600
 
 mvn_historical_drawdowns ("SPX", "PR", "20Y","20Y",2)
-drawdown_start = ['1987-08-26T00:00:00.000000000' '2000-03-27T00:00:00.000000000']
-drawdown_end = ['1987-12-04T00:00:00.000000000' '2001-04-04T00:00:00.000000000']
-Drawdown Performance = [-0.3351 -0.2777]
-Recovery Days = [600 nan]
+drawdown_start = 2000-03-26T00:00:00.000000000
+drawdown_end = 2001-04-04T00:00:00.000000000
+Performance =-0.277722
+Recovery Days = 2247
