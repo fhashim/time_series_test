@@ -74,7 +74,7 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
             else:
                 end_date = end_date - relativedelta(years=value)
         else:
-            end_date = str(parse(Period_End, fuzzy=False))
+            end_date = pd.Timestamp(parse(Period_End, fuzzy=False))
 
     except ValueError:
         raise ValueError("Period End date is not correct")
@@ -102,7 +102,7 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
             else:
                 start_date = start_date - relativedelta(years=value)
         else:
-            start_date = str(parse(Period_Start, fuzzy=False))
+            start_date = pd.Timestamp(parse(Period_Start, fuzzy=False))
 
     except ValueError:
         raise ValueError("Period Start date is not correct")
@@ -113,11 +113,10 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
     else:
         start_date = main_df.loc[main_df['Date'] <= start_date, 'Date'].max()
         print('Period Start Date not found in date using last available date i.e. {}'.format(start_date))
-    work_df = pd.DataFrame(index=pd.date_range(start_date, main_df.Date.max()))
-    work_df = work_df.join(main_df.set_index('Date'))
 
-    work_df.ffill(inplace=True)
-    work_df.bfill(inplace=True)
+    work_df = main_df.sort_values(by='Date')
+    work_df = work_df.set_index('Date')
+    work_df = work_df[work_df.index >= start_date]
 
     work_df['Returns'] = work_df['Price'].pct_change()
     work_df['Cum_Returns'] = (1 + work_df['Returns']).cumprod()
@@ -177,7 +176,5 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
 
 
 drawdown_start, drawdown_end, drawdown_performance, recovery_days, results = \
-    mvn_historical_drawdowns(Code="SPY US", Price_Type="GTR", Period_Start="Inception",  Rank=5)
-
-
-
+    mvn_historical_drawdowns(Code='IEFA US', Price_Type='GTR', Period_Start="2021-06-09",
+                             Period_End="2021-08-09",  Rank=1)
