@@ -5,7 +5,7 @@ Drawdown Performance = -0.551891
 Recovery Days = 1256
 
 mvn_historical_drawdowns ("SPY US", "GTR", "Inception", , 2)
-drawdown_start = 2000-03-26T00:00:00.000000000
+drawdown_start = 2000-03-24T00:00:00.000000000
 drawdown_end = 2002-10-09T00:00:00.000000000
 Drawdown Performance = -0.475153
 Recovery Days = 1478
@@ -53,7 +53,7 @@ Drawdown Performance = -0.567754
 Recovery Days = 1480
 
 mvn_historical_drawdowns ("SPX", "PR", "Inception",,3)
-drawdown_start = 2000-03-26T00:00:00.000000000
+drawdown_start = 2000-03-24T00:00:00.000000000
 drawdown_end = 2002-10-09T00:00:00.000000000
 Drawdown Performance = -0.491469
 Recovery Days = 1694
@@ -65,7 +65,7 @@ Drawdown Performance = -0.482036
 Recovery Days = 2114
 
 mvn_historical_drawdowns ("SPX", "PR", "Inception",,5)
-drawdown_start = 1968-12-01T00:00:00.000000000
+drawdown_start = 1968-11-29T00:00:00.000000000
 drawdown_end = 1970-05-26T00:00:00.000000000
 Drawdown Performance = -0.360616
 Recovery Days = 650
@@ -77,7 +77,13 @@ Drawdown Performance = -0.335095
 Recovery Days = 600
 
 mvn_historical_drawdowns ("SPX", "PR", "20Y","20Y",2)
-drawdown_start = 2000-03-26T00:00:00.000000000
+drawdown_start = 2000-03-24T00:00:00.000000000
 drawdown_end = 2001-04-04T00:00:00.000000000
-Performance =-0.277722
+Performance = -0.277722
 Recovery Days = 2247
+
+mvn_historical_drawdowns ("IEFA US", "GTR", "2021-06-09","2021-08-09",1)
+drawdown_start = 2021-06-15T00:00:00.000000000
+drawdown_end = 2021-07-19T00:00:00.000000000
+Performance = -0.05313
+Recovery Days = 25
