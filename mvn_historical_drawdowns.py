@@ -123,7 +123,7 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
     work_df['Previous_Peak'] = work_df['Cum_Returns'].cummax()
 
     # Calculate Drawdown
-    work_df['Drawdown'] = (work_df['Cum_Returns'] - work_df['Previous_Peak']) / work_df['Previous_Peak']
+    work_df['Drawdown'] = (work_df['Cum_Returns'] / work_df['Previous_Peak']) - 1.0
 
     x = pd.DataFrame(
         pd.concat([work_df.Cum_Returns, work_df.index.to_series()], axis=1)
@@ -177,4 +177,4 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
 
 drawdown_start, drawdown_end, drawdown_performance, recovery_days, results = \
     mvn_historical_drawdowns(Code='IEFA US', Price_Type='GTR', Period_Start="2021-06-09",
-                             Period_End="2021-08-09",  Rank=1)
+                             Period_End="2021-08-09", Rank=1)
