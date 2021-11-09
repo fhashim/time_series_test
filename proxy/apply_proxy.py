@@ -109,7 +109,7 @@ def parse_check_overlap_period(min_date, max_date, min_period, max_period, div_m
                                                      pd.tseries.offsets.QuarterEnd() * month_factor, \
                                                      overlap_max_end_date + \
                                                      pd.tseries.offsets.QuarterEnd() * month_factor
-        period = 'Q'
+        period, factor = 'Q', 4
 
     elif div_method == 'Average Calendar Monthly':
         month_factor = 0 if overlap_min_end_date.day % overlap_min_end_date.days_in_month == 0 else 1
@@ -117,14 +117,14 @@ def parse_check_overlap_period(min_date, max_date, min_period, max_period, div_m
                                                      pd.tseries.offsets.MonthEnd() * month_factor, \
                                                      overlap_max_end_date + \
                                                      pd.tseries.offsets.MonthEnd() * month_factor
-        period = 'M'
+        period, factor = 'M', 12
 
     elif div_method == 'Average Calendar Semi-Annual':
         overlap_min_end_date, overlap_max_end_date = overlap_min_end_date + \
                                                      pd.tseries.offsets.DateOffset(months=6), \
                                                      overlap_max_end_date + \
                                                      pd.tseries.offsets.DateOffset(months=6)
-        period = '6M'
+        period, factor = '6M', 2
 
     elif div_method == 'Average Calendar Annual':
         year_factor = 1 if overlap_min_end_date.day == overlap_min_end_date.days_in_month \
@@ -133,7 +133,8 @@ def parse_check_overlap_period(min_date, max_date, min_period, max_period, div_m
                                                      pd.tseries.offsets.YearEnd() * year_factor, \
                                                      overlap_max_end_date + \
                                                      pd.tseries.offsets.YearEnd() * year_factor
-        period = 'Y'
+        period, factor = 'Y', 1
+
     elif div_method == 'Average Annual':
         pass
 
@@ -147,7 +148,7 @@ def parse_check_overlap_period(min_date, max_date, min_period, max_period, div_m
     else:
         end_date, result = overlap_min_end_date, True
 
-    return end_date, period, result
+    return end_date, period, factor, result
 
 
 def apply_proxy_level_2(asset_code, price_type, methodology):
@@ -300,8 +301,8 @@ def proxy_two_extend_gtr_pr(asset_code, price_type, min_period='1Y', max_period=
     3) Updates df data and ensure all level 1 data is inplace for further calculations.
     4) Slice PR, GTR, NTR series
     '''
-    asset_code = 'SPX'
-    price_type = 'NTR'
+    # asset_code = 'SPX'
+    # price_type = 'NTR'
     # methodology = 'Raw+ExtendNTRFromPR+GTR'
     at, pt, st, sp, pl = read_dependency(asset_type=asset_code, price_type=price_type, proxy_level=2)
 
@@ -339,6 +340,8 @@ def proxy_two_extend_gtr_pr(asset_code, price_type, min_period='1Y', max_period=
         # Update df with data
         df = pd.read_sql(level_one_sql, create_connection())
 
+    df = df[['Date', 'Price', 'Asset_Code', 'Price_Type']]
+
     # Add Quarter and Quarter Index to df to be used for div yield and tax rate calculations.
     df['quarter'] = df['Date'].dt.quarter
     df['quarter_index'] = pd.PeriodIndex(df.Date, freq='Q')
@@ -356,8 +359,9 @@ def proxy_two_extend_gtr_pr(asset_code, price_type, min_period='1Y', max_period=
     overlap_min_date = max(pr_series.index.min(), gtr_series.index.min(), ntr_series.index.min())
     overlap_max_date = min(pr_series.index.max(), gtr_series.index.max(), ntr_series.index.max())
 
-    end_date, period, process = parse_check_overlap_period(overlap_min_date, overlap_max_date, min_period, max_period,
-                                                           div_method)
+    end_date, period, factor, process = parse_check_overlap_period(overlap_min_date, overlap_max_date, min_period,
+                                                                   max_period,
+                                                                   div_method)
     if process:
         gtr_resampled = gtr_series[(gtr_series.index >= overlap_min_date) & (gtr_series.index <= end_date)]. \
             resample(period).last()
@@ -384,7 +388,7 @@ def proxy_two_extend_gtr_pr(asset_code, price_type, min_period='1Y', max_period=
         resampled_series['quarter'] = resampled_series.index.quarter
 
         # use period to determine 4
-        div_yield_df = resampled_series.reset_index()[['div_yield', 'quarter']].groupby(['quarter']).mean() * 4
+        div_yield_df = resampled_series.reset_index()[['div_yield', 'quarter']].groupby(['quarter']).mean()  # * factor
 
         # add div yield to resampled series
         resampled_series = resampled_series.reset_index().set_index('quarter'). \
@@ -401,7 +405,9 @@ def proxy_two_extend_gtr_pr(asset_code, price_type, min_period='1Y', max_period=
         # Tax rate check to be clarified and added
 
         # create extension to NTR
-        extended_df = pd.DataFrame(index=pd.date_range(max(pr_series.index.min(), gtr_series.index.min()), end_date))
+        # Assumption: On first available NTR series date there exist a value both for GTR and PR
+        extended_df = pd.DataFrame(
+            index=pd.date_range(max(pr_series.index.min(), gtr_series.index.min()), ntr_series.index.min()))
 
         # add PR price
         extended_df = extended_df.join(pr_series['Price'].rename('PR'))
@@ -412,49 +418,38 @@ def proxy_two_extend_gtr_pr(asset_code, price_type, min_period='1Y', max_period=
         # drop rows containing any nan
         extended_df.dropna(inplace=True)
 
-        # add ntr value after end_date to df
-        extended_df ntr_series.iloc[ntr_series.index.get_loc(end_date) + 1, ]
+        # sort series
+        extended_df.sort_index(ascending=False, inplace=True)
 
+        # add NTR first value as price
+        extended_df = extended_df.join(ntr_series[ntr_series.index == ntr_series.index.min()]['Price'])
 
-        pass
+        # add avg.tax rate
+        extended_df['quarter'] = extended_df.index.quarter
+        extended_df = extended_df.reset_index().set_index('quarter').join(tax_rate_df).set_index('index')
+        extended_df.sort_index(ascending=False, inplace=True)
+        extended_df['tax_rate'] = extended_df['tax_rate'].shift()
+
+        extended_df['Price'] = (extended_df['Price'].combine_first(1 / (
+                ((extended_df['GTR'].shift()) / (extended_df['GTR'])) -
+                (((extended_df['GTR'].shift()) / (extended_df['GTR'])) -
+                 ((extended_df['PR'].shift()) / (extended_df['PR']))) * extended_df['tax_rate'])).cumprod())
+
+        extended_df['Asset_Code'] = 'SPX'
+        extended_df['Price_Type'] = 'NTR'
+        extended_df['Proxy_Level'] = 2
+        extended_df['Proxy_Name'] = np.nan
+        extended_df.reset_index(inplace=True)
+        extended_df = extended_df[['index', 'Asset_Code', 'Price_Type', 'Price', 'Proxy_Level', 'Proxy_Name']]
+        extended_df.rename(columns={'index': 'Date'}, inplace=True)
+
+        # Append with NTR series
+        ntr_series['Proxy_Level'] = 1
+        ntr_series['Proxy_Name'] = np.nan
+        extended_df = pd.concat([extended_df[1:], ntr_series[['Asset_Code', 'Price_Type',
+                                                              'Price', 'Proxy_Level', 'Proxy_Name',
+                                                              ]].reset_index()])
+        extended_df.sort_values('Date', inplace=True)
+        return extended_df
     else:
         return print('Overlap requirement not satisfied process terminated.')
-
-
-data = {'Date': ['2021-01-01', '2021-01-02', '2021-01-03', '2021-01-04', '2021-01-05',
-                 '2021-01-06', '2021-01-07'],
-        'Price': [np.nan, np.nan, np.nan, np.nan, 10, 11, 32],
-        'Proxy': [10, 20, 30, 24, 35, 45, 32],
-        'Calc': [np.nan, np.nan, np.nan, np.nan, 10 / 11, np.nan, np.nan]}
-tester = pd.DataFrame(data)
-tester = tester.sort_values('Date', ascending=False).reset_index(drop=True)
-tester = tester.iloc[2:, :]
-tester['Ca'] = tester.Calc.ffill() / tester.Calc.cumprod().shift(fill_value=1)
-
-data = {'Date': ['2021-01-13', '2021-01-08', '2021-01-04', '2021-01-03', '2021-01-01'],
-        'Price': [10, np.nan, np.nan, np.nan, np.nan],
-        'Proxy': [20, 30, 40, 50, 60],
-        'Div': [0.5, 0.6, 0.7, 0.8, 0.9],
-        'Days': [np.nan, 5, 4, 1, 2]}
-
-tester = pd.DataFrame(data)
-
-tester['Price'] = (tester['Price'].combine_first(tester['Proxy'].shift() / tester.eval('Proxy*Div*Days'))
-                   .cumprod().round(2))
-
-tester['Price'] = (tester['Price'].combine_first((tester.eval('Proxy') / tester['Proxy'].shift()) + 1 / (tester['Div'] *
-                                                                                                         tester[
-                                                                                                             'Days']))
-                   .cumprod().round(2))
-
-tester['Price'] = (
-    tester['Price'].combine_first(1 / ((tester.eval('Proxy').shift() / tester['Proxy']) + (tester['Div'] *
-                                                                                           tester['Days'])))
-        .cumprod().round(2))
-
-tester['Price'] = (tester['Price'].combine_first((tester['Proxy'].shift() / tester.eval('Proxy+(Div*Days)')) +
-                                                 tester.eval('Div*Days'))
-                   .cumprod().round(2))
-
-tester['Price'] = (tester['Price'].combine_first(tester['Proxy'].shift() / tester.eval('Proxy'))
-                   .cumprod().round(2))
