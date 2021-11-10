@@ -282,7 +282,6 @@ def proxy_two_extend_gtr(asset_code, price_type, min_period='1Y', max_period='3Y
     else:
         return print('Overlap requirement not satisfied process terminated.')
 
-    pass
 
 
 def proxy_two_extend_gtr_pr(asset_code, price_type, min_period='1Y', max_period='3Y',
