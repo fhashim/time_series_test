@@ -1,9 +1,12 @@
 """
-Calculate largest historic drawdowns and recovery period post a drawdown for a given portfolio(Can also be used on individual assets)
+Calculate largest historic drawdowns and recovery period post a
+drawdown for a given portfolio
+(Can also be used on individual assets)
 
 Function Signature:
 
-mvn_historical_drawdowns (Code, Price_Type, [Period_Start], *[Period_End], [Rank]*)
+mvn_historical_drawdowns (Code, Price_Type, [Period_Start],
+*[Period_End], [Rank]*)
 
 returns [DATE,DATE,FLOAT,INT]
 
@@ -11,8 +14,12 @@ Function Inputs:
 
 - Asset Code - STRING
 - Price Type - STRING
-- Period Start - [DATE or STRING] - Can be exact date ; an offset D/W/M/Y from Period End Date; or Inception(ie starting Oldest Price Date)
-- Period End - [DATE or STRING] - optional. Defaults to Latest Price Date. Can be exact date or as an offset D/W/M/Y from Latest Price Date
+- Period Start - [DATE or STRING] - Can be exact date ;
+                 an offset D/W/M/Y from Period End Date;
+                 or Inception(ie starting Oldest Price Date)
+- Period End - [DATE or STRING] - optional. Defaults to Latest Price
+               Date. Can be exact date or as an offset D/W/M/Y
+               from Latest Price Date
 - Rank - [INT]
 
 Function Outputs:
@@ -24,13 +31,21 @@ Function Outputs:
 
 Methodology:
 
-- From the asset time-series(using Asset Code/Price Type), find the Nth largest peak to trough performance(N being the Rank) and the time in days to recover the the previous peak.
-- Return the Drawdown Period(Start/End), Drawdown Performance, Recovery Days
+- From the asset time-series(using Asset Code/Price Type),
+    find the Nth largest peak to trough performance(N being the Rank)
+    and the time in days to recover the the previous peak.
+
+- Return the Drawdown Period(Start/End), Drawdown Performance,
+  Recovery Days
 
 Comments:
 
-- Period Start/Period End/Rank accept arrays, so multiple drawdowns can be calculated/returned at once
+- Period Start/Period End/Rank accept arrays, so multiple drawdowns
+    can be calculated/returned at once
 """
+import re
+
+from typing import Union
 
 import pandas as pd
 
@@ -40,146 +55,195 @@ from dateutil.parser import parse
 
 from dateutil.relativedelta import relativedelta
 
-import re
-
 from db_connection import create_connection
 
 
-def parse_dates(Period_Start, Period_End, df):
+def parse_dates(period_start: str, period_end: str,
+                data_frame: pd.DataFrame) -> Union[pd.Timestamp,
+                                                   pd.Timestamp]:
+    '''
+
+    :param period_start:
+    :param period_end:
+    :param data_frame:
+    :return:
+    '''
     # allowed offsets D: Daily, M: Monthly, W: Weekly, Y: Yearly
     offset_chars = set('DWMY')
 
-    # Parse and deal with Period End Date as Period Start depends on Period End
+    # Parse and deal with Period End Date as Period Start
+    # depends on Period End
     try:
-        if Period_End == 'Latest':
-            end_date = df.Date.max()
-        elif any((c in offset_chars) for c in Period_End):
-            end_date = df.Date.max()
-            value = int(re.findall(r'\d+', Period_End)[0])
-            if 'D' in Period_End:
+        if period_end == 'Latest':
+            end_date = data_frame.Date.max()
+        elif any((c in offset_chars) for c in period_end):
+            end_date = data_frame.Date.max()
+            value = int(re.findall(r'\d+', period_end)[0])
+            if 'D' in period_end:
                 end_date = end_date - relativedelta(days=value)
-            elif 'W' in Period_End:
+            elif 'W' in period_end:
                 end_date = end_date - relativedelta(weeks=value)
-            elif 'M' in Period_End:
+            elif 'M' in period_end:
                 end_date = end_date - relativedelta(months=value)
             else:
                 end_date = end_date - relativedelta(years=value)
         else:
-            end_date = pd.Timestamp(parse(Period_End, fuzzy=False))
-    except ValueError:
-        raise ValueError("Period End date is not correct")
+            end_date = pd.Timestamp(parse(period_end, fuzzy=False))
+    except ValueError as error:
+        raise ValueError("Period End date is not correct") from error
 
     # check if price on end date exists else use last available price
-    if end_date in df.Date.values:
+    if end_date in data_frame.Date.values:
         pass
     else:
-        end_date = df.loc[df['Date'] <= end_date, 'Date'].max()
-        print('Period End Date not found in date using last available date i.e. {}'.format(end_date))
+        end_date = data_frame.loc[data_frame['Date'] <= end_date,
+                                  'Date'].max()
+        print(f"Period End Date not found in date using last "
+              f"available date i.e. {end_date}")
 
     # Parse and deal with Period Start Date
     try:
-        if Period_Start == 'Inception':
-            start_date = df.Date.min()
-        elif any((c in offset_chars) for c in Period_Start):
+        if period_start == 'Inception':
+            start_date = data_frame.Date.min()
+        elif any((c in offset_chars) for c in period_start):
             start_date = end_date
-            value = int(re.findall(r'\d+', Period_Start)[0])
-            if 'D' in Period_Start:
+            value = int(re.findall(r'\d+', period_start)[0])
+            if 'D' in period_start:
                 start_date = start_date - relativedelta(days=value)
-            elif 'W' in Period_Start:
+            elif 'W' in period_start:
                 start_date = start_date - relativedelta(weeks=value)
-            elif 'M' in Period_Start:
+            elif 'M' in period_start:
                 start_date = start_date - relativedelta(months=value)
             else:
                 start_date = start_date - relativedelta(years=value)
         else:
-            start_date = pd.Timestamp(parse(Period_Start, fuzzy=False))
-    except ValueError:
-        raise ValueError("Period Start date is not correct")
+            start_date = pd.Timestamp(parse(period_start, fuzzy=False))
+    except ValueError as error:
+        raise ValueError("Period Start date is not correct") from error
 
-    # check if price on start date exists else use previous available price
-    if start_date in df.Date.values:
+    # check if price on start date exists else use previous available
+    # price
+
+    if start_date in data_frame.Date.values:
         pass
     else:
-        start_date = df.loc[df['Date'] <= start_date, 'Date'].max()
-        print('Period Start Date not found in date using last available date i.e. {}'.format(start_date))
-
+        start_date = data_frame.loc[data_frame['Date']
+                                    <= start_date, 'Date'].max()
+        print(f"Period Start Date not found in date using last "
+              f"available date i.e. {start_date}")
     return start_date, end_date
 
 
-def read_data(Code, Price_Type):
+def read_data(code: str, price_type: str) -> pd.DataFrame:
+    '''
+
+    :param code:
+    :param price_type:
+    :return:
+    '''
     # Create Connection with DB
     conn = create_connection()
 
-    # Get available Codes and PriceType from db
-    sql_distinct_code = ''' SELECT DISTINCT(CONCAT(Asset_Code, ' - ', Price_Type)) [Code] FROM time_series'''
+    # Get available codes and PriceType from db
+    sql_distinct_code = ''' SELECT DISTINCT(CONCAT(Asset_code, ' - ',
+    price_type)) [code] FROM time_series'''
+
     df_distinct_code = pd.read_sql(sql_distinct_code, conn)
 
-    # Check if passed Code and PriceType is available in DB
-    if Code + ' - ' + Price_Type in df_distinct_code.Code.values:
-        # Read data for specific Code and Price. Return resulting dataframe
-        read_data_sql = ''' SELECT Date, Price 
-                            FROM time_series  
-                            WHERE Asset_Code = '{}' and Price_Type = '{}'
-                            ORDER BY Date ASC  '''.format(Code, Price_Type)
-        df = pd.read_sql(read_data_sql, conn)
-        df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d')
-        return df
+    # Check if passed code and PriceType is available in DB
+    if code + ' - ' + price_type in df_distinct_code.code.values:
+        # Read data for specific code and Price. Return resulting
+        # dataframe
+
+        read_data_sql = f''' SELECT Date, Price
+                            FROM time_series
+                            WHERE Asset_code = '{code}'
+                            and price_type = '{price_type}'
+                            ORDER BY Date ASC  '''
+        data_frame = pd.read_sql(read_data_sql, conn)
+        data_frame['Date'] = pd.to_datetime(data_frame['Date'],
+                                            format='%Y-%m-%d')
+        # return df
 
     # Raise error if not available
     else:
-        raise ValueError("Code or Price Type does not exists in DB")
+        raise ValueError("code or Price Type does not exists in DB")
+
+    return data_frame
 
 
-def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_End='Latest', Rank=1):
-    main_df = read_data(Code, Price_Type)
-    start_date, end_date = parse_dates(Period_Start, Period_End, main_df)
+def get_historical_drawdowns(code: str, price_type: str,
+                             period_start: str = 'Inception',
+                             period_end: str = 'Latest',
+                             rank: int = 1):
+    """
+    :param code:
+    :param price_type:
+    :param period_start:
+    :param period_end:
+    :param rank:
+    :return:
+    """
+    main_df = read_data(code, price_type)
+    start_date, end_date = parse_dates(period_start, period_end,
+                                       main_df)
 
-    ''' Set date as df index '''
+    # Set date as df index
     main_df.set_index('Date', inplace=True)
 
-    ''' Filter out all data after start_date as Recovery days is not bound by Period End '''
+    # Filter out all data after start_date as Recovery days
+    # is not bound by Period End
     main_df = main_df[main_df.index >= start_date]
 
-    ''' Compute returns for Price time series '''
+    # Compute returns for Price time series
     main_df['Returns'] = main_df['Price'].pct_change()
 
-    ''' Compute cumulative returns using Returns '''
+    # Compute cumulative returns using Returns
     main_df['Cum_Returns'] = (1 + main_df['Returns']).cumprod()
 
-    ''' Generate column Previous Peak to identify last peak (highest cumulative returns) from current data point. '''
+    # Generate column Previous Peak to identify last peak
+    # (highest cumulative returns) from current data point.
     main_df['Previous_Peak'] = main_df['Cum_Returns'].cummax()
 
-    ''' Calculate Drawdown '''
-    main_df['Drawdown'] = (main_df['Cum_Returns'] / main_df['Previous_Peak']) - 1.0
+    # Calculate Drawdown
+    main_df['Drawdown'] = (main_df['Cum_Returns'] /
+                           main_df['Previous_Peak']) - 1.0
 
-    ''' Returns df with cumulative maximum applied on Cum_Returns along with Dates to find Date on which Previous Peak
-        occurred. '''
-    x = pd.DataFrame(
-        pd.concat([main_df.Cum_Returns, main_df.index.to_series()], axis=1)
+    # Returns df with cumulative maximum applied on Cum_Returns
+    # along with Dates to find Date on which Previous Peak occurred.
+
+    df_cum = pd.DataFrame(
+        pd.concat([main_df.Cum_Returns, main_df.index.to_series()],
+                  axis=1)
             .agg(tuple, axis=1)
             .cummax()
             .to_list(),
         columns=["Previous_Peak", "Previous_Peak_index"],
     )
 
-    ''' Previous Peak index replaced with NaT where Previous_Peak is NaN '''
-    x[x.isna().any(axis=1)] = np.nan
+    # Previous Peak index replaced with NaT where Previous_Peak is NaN
 
-    '''Creates a group by object on Previous_Peak_index agg as list and results are shift to find the upcoming Previous
-        Peak index (i.e. Next_PP_index) '''
-    g = (
-        x.groupby("Previous_Peak_index")["Previous_Peak_index"]
+    df_cum[df_cum.isna().any(axis=1)] = np.nan
+
+    # Creates a group by object on Previous_Peak_index agg as list and
+    # results are shift to find the upcoming Previous
+    # Peak index (i.e. Next_PP_index) '''
+    df_grouped = (
+        df_cum.groupby("Previous_Peak_index")["Previous_Peak_index"]
             .agg(list)
             .str[0]
             .shift(-1)
     )
 
-    ''' With x containing Previous_Peak_index apply left join with g a group by object containing Next_PP_index.
-        Use Previous_Peak_index as a key to join from left frame
-        Use index from g as key to perform left join.
-        Rename columns as Previous_Peak_index and Next_PP_index respectively. '''
-    x = x.merge(
-        g, left_on="Previous_Peak_index", right_index=True, how="left"
+    # With df_cum containing Previous_Peak_index apply left join
+    # with df_grouped a group by object containing Next_PP_index.
+    # Use Previous_Peak_index as a key to join from left frame
+    # Use index from df_grouped as key to perform left join.
+    # Rename columns as Previous_Peak_index and Next_PP_index
+    # respectively.
+    df_cum = df_cum.merge(
+        df_grouped, left_on="Previous_Peak_index", right_index=True,
+        how="left"
     ).rename(
         columns={
             "Previous_Peak_index_x": "Previous_Peak_index",
@@ -187,40 +251,45 @@ def mvn_historical_drawdowns(Code, Price_Type, Period_Start='Inception', Period_
         }
     )
 
-    ''' Create column for Previous_Peak_index & Next_PP_index in actual df - Used for further calculations.
-        Replaced Previous_Peak value. '''
-    main_df[["Previous_Peak", "Previous_Peak_index", "Next_PP_index"]] = x.values
+    # Create column for Previous_Peak_index & Next_PP_index in actual
+    # df - Used for further calculations.
+    # Replaced Previous_Peak value.
+    main_df[["Previous_Peak", "Previous_Peak_index",
+             "Next_PP_index"]] = df_cum.values
 
-    ''' Create Column for Price on Previous Peak '''
-    main_df['PP_Price'] = main_df.join(main_df.drop('Previous_Peak_index', axis=1), on='Previous_Peak_index',
-                                       rsuffix='_y')['Price_y'].values
+    # Create Column for Price on Previous Peak
+    main_df['PP_Price'] = \
+        main_df.join(main_df.drop('Previous_Peak_index', axis=1),
+                     on='Previous_Peak_index',
+                     rsuffix='_y')['Price_y'].values
 
-    ''' Calculate recovery days in case data is NA Recovery_Days = -1 '''
-    main_df['Recovery_Days'] = np.where(pd.isna(main_df['Next_PP_index']),
-                                        -1,
-                                        (main_df['Next_PP_index'] - main_df.index).dt.days)
+    # Calculate recovery days in case data is NA Recovery_Days = -1
 
-    ''' Filter out up to end_date to generate stats. '''
-    main_df = main_df[(main_df.index >= start_date) & (main_df.index <= end_date)]
+    main_df['Recovery_Days'] = np.where(
+        pd.isna(main_df['Next_PP_index']),
+        -1,
+        (main_df['Next_PP_index'] - main_df.index).dt.days)
 
-    ''' Sort Values based on Drawdown to out desried rank '''
-    main_df = main_df.sort_values('Drawdown').drop_duplicates('Previous_Peak_index')
+    # Filter out up to end_date to generate stats.
+    main_df = main_df[
+        (main_df.index >= start_date) & (main_df.index <= end_date)]
 
-    '''Check if Rank is within available limits else throw exception'''
-    if Rank <= main_df.shape[0]:
-        main_df = main_df.iloc[:Rank, :][-1:]
+    # Sort Values based on Drawdown to out desried rank
+    main_df = main_df.sort_values('Drawdown').drop_duplicates(
+        'Previous_Peak_index')
+
+    # Check if rank is within available limits else throw exception
+    if rank <= main_df.shape[0]:
+        main_df = main_df.iloc[:rank, :][-1:]
     else:
-        raise ValueError("Required Rank not found.")
+        raise ValueError("Required rank not found.")
 
-    ''' Function output in desired format. '''
-    drawdown_start = (main_df['Previous_Peak_index'].values)[0].astype(str)
-    drawdown_end = (main_df.index.values)[0].astype(str)
+    # Function output in desired format.
+    drawdown_start = (main_df['Previous_Peak_index'].values)[0].astype(
+        str)
+    drawdown_end = main_df.index.values[0].astype(str)
     drawdown_performance = (np.round(main_df['Drawdown'].values, 6))[0]
     recovery_days = ((main_df['Recovery_Days'].values).astype(int))[0]
 
-    return drawdown_start, drawdown_end, drawdown_performance, recovery_days
-
-
-drawdown_start, drawdown_end, drawdown_performance, recovery_days = \
-    mvn_historical_drawdowns(Code='IEFA US', Price_Type='GTR', Period_Start="2021-06-09", Period_End='2021-08-09',
-                             Rank=1)
+    return drawdown_start, drawdown_end, drawdown_performance, \
+           recovery_days
