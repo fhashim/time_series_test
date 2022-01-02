@@ -63,10 +63,10 @@ def parse_dates(period_start: str, period_end: str,
                                                    pd.Timestamp]:
     '''
 
-    :param period_start:
-    :param period_end:
-    :param data_frame:
-    :return:
+    :param period_start: Date String
+    :param period_end: Date String
+    :param data_frame: Pandas DataFrame
+    :return: Pandas Timestamp
     '''
     # allowed offsets D: Daily, M: Monthly, W: Weekly, Y: Yearly
     offset_chars = set('DWMY')
@@ -137,9 +137,9 @@ def parse_dates(period_start: str, period_end: str,
 def read_data(code: str, price_type: str) -> pd.DataFrame:
     '''
 
-    :param code:
-    :param price_type:
-    :return:
+    :param code: Asset Code String
+    :param price_type: Price Type String
+    :return: Pandas DataFrame
     '''
     # Create Connection with DB
     conn = create_connection()
@@ -173,17 +173,23 @@ def read_data(code: str, price_type: str) -> pd.DataFrame:
 
 
 def get_historical_drawdowns(code: str, price_type: str,
-                             period_start: str = 'Inception',
-                             period_end: str = 'Latest',
-                             rank: int = 1):
+                             period_start: Union[str, None],
+                             period_end: Union[str, None],
+                             rank: Union[int, None]) -> \
+        Union[np.datetime64, float, int]:
     """
-    :param code:
-    :param price_type:
-    :param period_start:
-    :param period_end:
-    :param rank:
+    :param code: Asset Code str
+    :param price_type: Price Type str
+    :param period_start: Date str
+    :param period_end: Date str
+    :param rank: Rank of drawdown
     :return:
     """
+    # using defaults where passed value is none
+    period_start = 'Inception' if period_start is None else period_start
+    period_end = 'Latest' if period_end is None else period_end
+    rank = 1 if rank is None else rank
+
     main_df = read_data(code, price_type)
     start_date, end_date = parse_dates(period_start, period_end,
                                        main_df)
@@ -286,10 +292,34 @@ def get_historical_drawdowns(code: str, price_type: str,
 
     # Function output in desired format.
     drawdown_start = (main_df['Previous_Peak_index'].values)[0].astype(
-        str)
-    drawdown_end = main_df.index.values[0].astype(str)
+        'M8[D]')
+    drawdown_end = main_df.index.values[0].astype('M8[D]')
     drawdown_performance = (np.round(main_df['Drawdown'].values, 6))[0]
     recovery_days = ((main_df['Recovery_Days'].values).astype(int))[0]
 
     return drawdown_start, drawdown_end, drawdown_performance, \
            recovery_days
+
+
+def execute_drawdowns(asset_type: list, price_type: list,
+                      period_start: list, period_end: list,
+                      rank: list) -> dict:
+    '''
+    :param asset_type:
+    :param price_type:
+    :param period_start:
+    :param period_end:
+    :param rank:
+    :return:
+    '''
+    drawdown_vec = np.vectorize(get_historical_drawdowns,
+                                otypes=[np.datetime64, np.datetime64,
+                                        float, int])
+
+    result_list = drawdown_vec(asset_type, price_type, period_start,
+                               period_end, rank)
+    result_dict = {'drawdown_start': result_list[0],
+                   'drawdown_end': result_list[1],
+                   'drawdown_performance': result_list[2],
+                   'recovery_days': result_list[3]}
+    return result_dict
