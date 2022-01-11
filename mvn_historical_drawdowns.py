@@ -301,7 +301,7 @@ def get_historical_drawdowns(code: str, price_type: str,
            recovery_days
 
 
-def execute_drawdowns(asset_type: list, price_type: list,
+def execute_drawdowns(asset_type: str, price_type: str,
                       period_start: list, period_end: list,
                       rank: list) -> dict:
     '''
