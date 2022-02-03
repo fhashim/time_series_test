@@ -314,8 +314,8 @@ def historical_drawdowns(asset_code: str, price_type: str,
     '''
 
     if None in period_start:
-        raise TypeError('Period Start - Date, Offset or String ("Inception") '
-                        'expected instead got NoneType')
+        raise TypeError('Period Start - Date, Offset or String '
+                        '("Inception") expected instead got NoneType')
 
     drawdown_vec = np.vectorize(get_historical_drawdowns,
                                 otypes=[np.datetime64, np.datetime64,
