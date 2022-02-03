@@ -186,7 +186,7 @@ def get_historical_drawdowns(code: str, price_type: str,
     :return:
     """
     # using defaults where passed value is none
-    period_start = 'Inception' if period_start is None else period_start
+    # period_start = 'Inception' if period_start is None else period_start
     period_end = 'Latest' if period_end is None else period_end
     rank = 1 if rank is None else rank
 
@@ -301,22 +301,27 @@ def get_historical_drawdowns(code: str, price_type: str,
            recovery_days
 
 
-def historical_drawdowns(asset_type: str, price_type: str,
-                      period_start: list, period_end: list,
-                      rank: list) -> dict:
+def historical_drawdowns(asset_code: str, price_type: str,
+                         period_start: list, period_end: list,
+                         rank: list) -> dict:
     '''
-    :param asset_type:
+    :param asset_code:
     :param price_type:
     :param period_start:
     :param period_end:
     :param rank:
     :return:
     '''
+
+    if None in period_start:
+        raise TypeError('Period Start - Date, Offset or String ("Inception") '
+                        'expected instead got NoneType')
+
     drawdown_vec = np.vectorize(get_historical_drawdowns,
                                 otypes=[np.datetime64, np.datetime64,
                                         float, int])
 
-    result_list = drawdown_vec(asset_type, price_type, period_start,
+    result_list = drawdown_vec(asset_code, price_type, period_start,
                                period_end, rank)
     result_dict = {'drawdown_start': result_list[0],
                    'drawdown_end': result_list[1],
