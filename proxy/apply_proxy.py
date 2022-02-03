@@ -4,7 +4,7 @@ import numpy as np
 
 from mvn_historical_drawdowns import read_data
 
-from db_connection import create_connection, connection_engine
+from db_connection import create_connection, odbc_engine
 
 from dateutil.relativedelta import relativedelta
 
@@ -12,10 +12,36 @@ import re
 
 
 def write_data(df):
-    engine = connection_engine()
+    engine = create_connection()
     tsql_chunksize = 2097 // len(df.columns)
     tsql_chunksize = 1000 if tsql_chunksize > 1000 else tsql_chunksize
-    df.to_sql('time_series_proxy', engine, if_exists='append', index=False, chunksize=tsql_chunksize)
+    df.to_sql('time_series_proxy_220122', engine, if_exists='append', index=False, chunksize=tsql_chunksize)
+
+
+def read_local_file(file_path):
+    l1_cases = pd.read_excel(r'{}'.format(file_path),
+                             sheet_name='Level 1 Definitions')
+
+    l2_cases = pd.read_excel(r'{}'.format(file_path),
+                             sheet_name='Level 2 Definitions')
+
+    l1_cases.columns = ['Asset_Type', 'Price_Type', 'Source_Type', 'Source_Price', 'Cutoff']
+    l1_cases['proxy_level'] = 1
+
+    l2_cases.columns = ['Asset_Type', 'Price_Type', 'Methodology', 'Source_Type', 'Source_Price', 'Source_Level',
+                        'Parameters']
+    l2_cases['proxy_level'] = 2
+
+    dependency_tbl = pd.concat([l1_cases[['Asset_Type', 'Price_Type', 'Source_Type', 'Source_Price', 'proxy_level']],
+                                l2_cases[['Asset_Type', 'Price_Type', 'Source_Type', 'Source_Price', 'proxy_level']]])
+
+    dependency_tbl['Source_Type'] = np.where(dependency_tbl['Source_Type'].isna(),
+                                             dependency_tbl['Asset_Type'], dependency_tbl['Source_Type'])
+
+    dependency_tbl['Source_Price'] = np.where(dependency_tbl['Source_Price'].isna(),
+                                              dependency_tbl['Price_Type'], dependency_tbl['Source_Price'])
+
+    return l1_cases, l2_cases, dependency_tbl
 
 
 def read_dependency(asset_type, price_type, proxy_level):
@@ -24,7 +50,7 @@ def read_dependency(asset_type, price_type, proxy_level):
     source_type_list = []
     source_price_list = []
     proxy_level_list = [proxy_level]
-    cnxn = create_connection()
+    cnxn = odbc_engine()
     cursor = cnxn.cursor()
 
     while proxy_level >= 1:
@@ -102,6 +128,10 @@ def parse_check_overlap_period(min_date, max_date, min_period, max_period, div_m
     else:
         raise ValueError("Minimum overlap period is not correct")
 
+    # Check if min date is less than max date
+    if overlap_min_end_date > overlap_max_end_date:
+        raise ValueError("Overlap Minimum Date should be less than Overlap Maximum Date")
+
     if div_method == 'Average Calendar Quarterly':
         month_factor = 0 if overlap_min_end_date.month % 3 == 0 and \
                             overlap_min_end_date.day == overlap_min_end_date.days_in_month else 1
@@ -123,10 +153,10 @@ def parse_check_overlap_period(min_date, max_date, min_period, max_period, div_m
 
         overlap_min_end_date, overlap_max_end_date = overlap_min_end_date + \
                                                      pd.tseries.offsets.YearEnd() * year_factor - \
-                                                     pd.tseries.offsets.DateOffset(months=6), \
+                                                     pd.tseries.offsets.DateOffset(months=6) * year_factor, \
                                                      overlap_max_end_date + \
                                                      pd.tseries.offsets.YearEnd() * year_factor - \
-                                                     pd.tseries.offsets.DateOffset(months=6)
+                                                     pd.tseries.offsets.DateOffset(months=6) * year_factor
 
     elif div_method == 'Average Calendar Annual':
         year_factor = 0 if overlap_min_end_date.day == overlap_min_end_date.days_in_month \
@@ -137,12 +167,9 @@ def parse_check_overlap_period(min_date, max_date, min_period, max_period, div_m
                                                      overlap_max_end_date + \
                                                      pd.tseries.offsets.YearEnd() * year_factor
     elif div_method == 'Average Annual':
-        year_factor = 1 if overlap_min_end_date.month <= 6 else 2
-        overlap_min_end_date, overlap_max_end_date = overlap_min_end_date + \
-                                                     pd.tseries.offsets.YearEnd() * year_factor - \
-                                                     pd.tseries.offsets.DateOffset(months=6), \
-                                                     overlap_max_end_date + pd.tseries.offsets.YearEnd() * \
-                                                     year_factor - pd.tseries.offsets.DateOffset(months=6)
+        # if overlap_min_end_date.day == overlap_min_end_date.days_in_month and overlap_min_end_date.month == 12:
+        overlap_min_end_date, overlap_max_end_date = overlap_min_end_date,  overlap_max_end_date
+
     else:
         raise ValueError("Provide a valid Dividend Yield Period")
 
@@ -183,9 +210,9 @@ def create_period_index(df, div_method):
         factor = 1
 
     elif div_method == 'Average Annual':
-        months = [6]
+        df['period_index'] = pd.PeriodIndex(df.Date, freq='Y')
+        months = [12]
         factor = 1
-        pass
 
     else:
         raise ValueError("Pass a valid div yield method!")
@@ -194,13 +221,13 @@ def create_period_index(df, div_method):
 
 
 def proxy_two_extend_gtr(asset_code, price_type, min_period='1Y', max_period='3Y',
-                         div_method='Average Calendar Quarterly'):
+                         div_method='Average Calendar Quarterly', source_level=2):
     '''
-    Apply proxy level 2 to extend GTR using PR. \n
-    1) Identify if proxy level 1 series of price type PR exists for current Asset Code. \n
-    2) Identify if proxy level 1 series exists for current Asset Code and Price Type. \n
-    3) Updates df data and ensure all level 1 data is inplace for further calculations. \n
-    5) If level 2 proxy data is available for PR than use for GTR extension calculations. \n
+    Raw+ExtendGTRFromPR
+    Apply proxy level 2 - Extend Raw series using GTR and PR. \n
+    1) Identify if proxy level 1 series of price type PR & GTR exists for current Asset Code. \n
+    2) Updates df data and ensure all level 1 data is inplace for further calculations. \n
+    3) If level 2 proxy data is available use for extension calculations. Identified by source level \n
     6) Find max of PR, GTR min date. \n
     7) Find min of PR, GTR max date. \n
     8) Identify the overlap period using `parse_check_overlap_period`. \n
@@ -208,6 +235,7 @@ def proxy_two_extend_gtr(asset_code, price_type, min_period='1Y', max_period='3Y
     10) Agg. div yield based on period index identified by div_method and get avg div yield. \n
     11) Use div yield to extend GTR on dates when PR value is known. \n
     12) Writes results to DB using `write_df`.
+    :param source_level:
     :param asset_code:
     :param price_type:
     :param min_period:
@@ -229,9 +257,9 @@ def proxy_two_extend_gtr(asset_code, price_type, min_period='1Y', max_period='3Y
     l1_pl = pl[0]
 
     # Check if level 1 PR, GTR exists for current source asset and price type
-    level_one_sql = ''' SELECT * FROM time_series_proxy WHERE Asset_Code = '{}'
-                                AND Price_Type IN ('{}', 'PR') and Proxy_Level = {}''' \
-        .format(l1_at, l1_pt, l1_pl)
+    level_one_sql = ''' SELECT * FROM time_series_proxy_220122 WHERE Asset_Code = '{}'
+                                AND Price_Type IN ('GTR', 'PR') and Proxy_Level = {}''' \
+        .format(l1_at, l1_pl)
 
     df = pd.read_sql(level_one_sql, create_connection())
 
@@ -249,13 +277,14 @@ def proxy_two_extend_gtr(asset_code, price_type, min_period='1Y', max_period='3Y
         # Update df with data
         df = pd.read_sql(level_one_sql, create_connection())
 
-    # Use PR series level 2 data if available for passed asset and price type (TBC)
-    level_two_sql = ''' SELECT * FROM time_series_proxy WHERE Asset_Code = '{}'
-                                    AND Price_Type IN ('PR') and Proxy_Level = 2''' \
-        .format(asset_code)
+    if source_level == 2:
+        # Use PR series level 2 data if available for passed asset and price type (TBC)
+        level_two_sql = ''' SELECT * FROM time_series_proxy_220122 WHERE Asset_Code = '{}'
+                                        AND Price_Type IN ('PR') and Proxy_Level = 2''' \
+            .format(asset_code)
 
-    # Append level 2 PR data if exists
-    df = pd.concat([pd.read_sql(level_two_sql, create_connection()), df])
+        # Append level 2 PR data if exists
+        df = pd.concat([pd.read_sql(level_two_sql, create_connection()), df])
 
     # Slice relevant columns for process
     df = df[['Date', 'Price', 'Asset_Code', 'Price_Type']]
@@ -382,7 +411,7 @@ def proxy_two_extend_gtr(asset_code, price_type, min_period='1Y', max_period='3Y
 
 
 def proxy_two_extend_gtr_pr(asset_code, price_type, min_period='1Y', max_period='3Y',
-                            div_method='Average Calendar Quarterly', tax_min=-0.05, tax_max=0.5):
+                            div_method='Average Calendar Quarterly', tax_min=-0.05, tax_max=0.5, source_level=2):
     '''
     Apply proxy level 2 to extend NTR using PR and GTR. \n
     1) Identify if proxy level 1 series of price type PR & GTR exists for current Asset Code. \n
@@ -397,6 +426,7 @@ def proxy_two_extend_gtr_pr(asset_code, price_type, min_period='1Y', max_period=
     11) Use tax_rate_df to extend NTR on dates when both PR and GTR value is known. \n
     12) Writes results to DB using `write_df`.
 
+    :param source_level:
     :param asset_code:
     :param price_type:
     :param min_period:
@@ -413,10 +443,10 @@ def proxy_two_extend_gtr_pr(asset_code, price_type, min_period='1Y', max_period=
     l1_pt = pt[0]
     l1_pl = pl[0]
 
-    # Check if level 1 PR, GTR & NTR exists for current source asst and price type
-    level_one_sql = ''' SELECT * FROM time_series_proxy WHERE Asset_Code = '{}'
-                            AND Price_Type IN ('{}', 'PR','GTR') and Proxy_Level = {}''' \
-        .format(l1_at, l1_pt, l1_pl)
+    # Check if level 1 PR, GTR & NTR exists for current source asset and price type
+    level_one_sql = ''' SELECT * FROM time_series_proxy_220122 WHERE Asset_Code = '{}'
+                            AND Price_Type IN ('NTR', 'PR','GTR') and Proxy_Level = {}''' \
+        .format(l1_at, l1_pl)
 
     df = pd.read_sql(level_one_sql, create_connection())
 
@@ -435,19 +465,19 @@ def proxy_two_extend_gtr_pr(asset_code, price_type, min_period='1Y', max_period=
         df = pd.read_sql(level_one_sql, create_connection())
 
     # Create level 1 NTR series if does not exists
-    if df[(df['Asset_Code'] == l1_at) & (df['Price_Type'] == l1_pt)].shape[0] == 0:
+    if df[(df['Asset_Code'] == l1_at) & (df['Price_Type'] == 'NTR')].shape[0] == 0:
         apply_proxy_level_1(asset_code=l1_at, price_type=l1_pt)
 
         # Update df with data
         df = pd.read_sql(level_one_sql, create_connection())
+    if source_level == 2:
+        # Check if for the asset type level 2 proxy data exist when price type is PR or GTR
+        level_two_sql = ''' SELECT * FROM time_series_proxy_220122 WHERE Asset_Code = '{}'
+                                    AND Price_Type IN ('PR','GTR') and Proxy_Level = 2 ''' \
+            .format(asset_code)
 
-    # Check if for the asset type level 2 proxy data exist when price type is PR or GTR
-    level_two_sql = ''' SELECT * FROM time_series_proxy WHERE Asset_Code = '{}'
-                                AND Price_Type IN ('PR','GTR') and Proxy_Level = 2 ''' \
-        .format(asset_code)
-
-    # add level 2 data if available.
-    df = pd.concat([pd.read_sql(level_two_sql, create_connection()), df])
+        # add level 2 data if available.
+        df = pd.concat([pd.read_sql(level_two_sql, create_connection()), df])
 
     df = df[['Date', 'Price', 'Asset_Code', 'Price_Type']]
 
@@ -579,3 +609,127 @@ def proxy_two_extend_gtr_pr(asset_code, price_type, min_period='1Y', max_period=
     # process terminated if minimum overlap check is failed
     else:
         return print('Overlap requirement not satisfied process terminated.')
+
+def proxy_two_extend_gtr_pr(asset_code, price_type, tax_rate, source_level = 2):
+
+
+    at, pt, st, sp, pl = read_dependency(asset_type=asset_code, price_type=price_type, proxy_level=2)
+
+    l1_at = at[0]
+    l1_pt = pt[0]
+    l1_pl = pl[0]
+
+    # Check if level 1 PR, GTR & NTR exists for current source asset and price type
+    level_one_sql = ''' SELECT * FROM time_series_proxy_220122 WHERE Asset_Code = '{}'
+                                AND Price_Type IN ('PR','GTR') and Proxy_Level = {}''' \
+        .format('SPX', 1)
+
+    df = pd.read_sql(level_one_sql, create_connection())
+
+    # Create level 1 GTR series if does not exists
+    if df[(df['Asset_Code'] == l1_at) & (df['Price_Type'] == 'GTR')].shape[0] == 0:
+        apply_proxy_level_1(asset_code=l1_at, price_type='GTR')
+
+        # Update df with data
+        df = pd.read_sql(level_one_sql, create_connection())
+
+    # Create level 1 PR series if does not exists
+    if df[(df['Asset_Code'] == l1_at) & (df['Price_Type'] == 'PR')].shape[0] == 0:
+        apply_proxy_level_1(asset_code=l1_at, price_type='PR')
+
+        # Update df with data
+        df = pd.read_sql(level_one_sql, create_connection())
+
+    if source_level == 2:
+        # Check if for the asset type level 2 proxy data exist when price type is PR or GTR
+        level_two_sql = ''' SELECT * FROM time_series_proxy_220122 WHERE Asset_Code = '{}'
+                                        AND Price_Type IN ('PR','GTR') and Proxy_Level = 2 ''' \
+            .format('SPX')
+
+        # add level 2 data if available.
+        df = pd.concat([pd.read_sql(level_two_sql, create_connection()), df])
+
+    df = df[['Date', 'Price', 'Asset_Code', 'Price_Type']]
+
+    # Slice PR, GTR & NTR series
+    pr_series = df[df['Price_Type'] == 'PR']
+    gtr_series = df[df['Price_Type'] == 'GTR']
+    # ntr_series = df[df['Price_Type'] == 'NTR']
+
+    # Set date as index
+    pr_series.set_index('Date', inplace=True)
+    gtr_series.set_index('Date', inplace=True)
+    # ntr_series.set_index('Date', inplace=True)
+
+    extended_df = pd.DataFrame(
+        index=pd.date_range(max(pr_series.index.min(), gtr_series.index.min()),
+                            min(pr_series.index.max(), gtr_series.index.max())
+                            )
+    )
+
+    # add PR price
+    extended_df = extended_df.join(pr_series['Price'].rename('PR'))
+
+    # add GTR price
+    extended_df = extended_df.join(gtr_series['Price'].rename('GTR'))
+
+    # drop rows containing any nan
+    extended_df.dropna(inplace=True)
+
+    # add NTR first value as price
+    extended_df = extended_df.join(gtr_series[gtr_series.index == gtr_series.index.min()]['Price'])
+
+    extended_df['Price'] = (extended_df['Price'].combine_first(
+            ((extended_df['GTR']) / (extended_df['GTR'].shift())) -
+            (((extended_df['GTR']) / (extended_df['GTR'].shift())) -
+             ((extended_df['PR']) / (extended_df['PR'].shift()))) * tax_rate).cumprod())
+
+    # restructure df to be passed on to DB
+    extended_df['Asset_Code'] = asset_code
+    extended_df['Price_Type'] = price_type
+    extended_df['Proxy_Level'] = 2
+    extended_df['Proxy_Name'] = np.nan
+    extended_df.reset_index(inplace=True)
+    extended_df = extended_df[['index', 'Asset_Code', 'Price_Type', 'Price', 'Proxy_Level', 'Proxy_Name']]
+    extended_df.rename(columns={'index': 'Date'}, inplace=True)
+    extended_df.sort_values('Date', inplace=True)
+
+    # write to db
+    write_data(extended_df)
+
+
+
+result = apply_proxy_level_1('GLDM US', 'PR')
+result = apply_proxy_level_1('GLDM US', 'GTR')
+result = apply_proxy_level_1('GLDM US', 'NTR')
+result = apply_proxy_level_1('SPXS LN', 'PR')
+result = apply_proxy_level_1('SPXS LN', 'GTR')
+result = apply_proxy_level_1('SPXS LN', 'NTR')
+result = apply_proxy_level_1('SPX', 'PR')
+result = apply_proxy_level_1('SPX', 'GTR')
+result = apply_proxy_level_1('SPX', 'NTR')
+result = apply_proxy_level_1('GOLDLNPM', 'PR', cutoff='1968-04-01')
+result = apply_proxy_level_1('GOLDLNPM', 'GTR', cutoff='1968-04-01')
+result = apply_proxy_level_1('GOLDLNPM', 'NTR', cutoff='1968-04-01')
+result = apply_proxy_level_1('SPX2', 'PR')
+result = apply_proxy_level_1('SPX2', 'GTR')
+result = apply_proxy_level_1('SPX2', 'NTR')
+result = apply_proxy_level_1('SPX3', 'PR')
+result = apply_proxy_level_1('SPX3', 'GTR')
+result = apply_proxy_level_1('SPX3', 'NTR')
+result = apply_proxy_level_1('SPX4', 'PR')
+result = apply_proxy_level_1('SPX4', 'GTR')
+result = apply_proxy_level_1('SPX4', 'NTR')
+result = apply_proxy_level_1('SPX5', 'PR')
+result = apply_proxy_level_1('SPX5', 'GTR')
+result = apply_proxy_level_1('SPX5', 'NTR')
+result = proxy_two_extend_gtr('SPX', 'GTR')
+result = proxy_two_extend_gtr('SPX2', 'GTR', max_period='2Y', div_method='Average Calendar Monthly')
+result = proxy_two_extend_gtr('SPX3', 'GTR', max_period='5Y', div_method='Average Calendar Annual')
+result = proxy_two_extend_gtr('SPX4', 'GTR', min_period='40Y')
+result = proxy_two_extend_gtr('SPX5', 'GTR')
+result = proxy_two_extend_gtr_pr('SPX', 'NTR')
+result = proxy_two_extend_gtr_pr('SPX2', 'NTR', div_method='Average Calendar Semi-Annual', max_period='4Y')
+result = proxy_two_extend_gtr_pr('SPX3', 'NTR', div_method='Average Annual', max_period='5Y')
+result = proxy_two_extend_gtr_pr('SPX4', 'NTR', tax_max=0.2)
+result = proxy_two_extend_gtr_pr('SPX5', 'NTR', source_level=1)
