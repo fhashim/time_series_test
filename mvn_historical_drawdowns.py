@@ -131,6 +131,8 @@ def parse_dates(period_start: str, period_end: str,
                                     <= start_date, 'Date'].max()
         print(f"Period Start Date not found in date using last "
               f"available date i.e. {start_date}")
+    print(
+        "Start Date: {} and End Date: {}".format(start_date, end_date))
     return start_date, end_date
 
 
@@ -328,3 +330,48 @@ def historical_drawdowns(asset_code: str, price_type: str,
                    'drawdown_performance': result_list[2],
                    'recovery_days': result_list[3]}
     return result_dict
+
+
+def case_iterator(asset_code, price_type, period_start, period_end,
+                  rank):
+    main_df = read_data(asset_code, price_type)
+    drawdown_start_list = []
+    drawdown_end_list = []
+    drawdown_performance_list = []
+    recovery_days_list = []
+    for start_date, end_date, rank_val in zip(period_start, period_end,
+                                              rank):
+        try:
+            drawdown_start, drawdown_end, drawdown_performance, \
+            recovery_days = get_historical_drawdowns(asset_code,
+                                                     price_type,
+                                                     start_date,
+                                                     end_date,
+                                                     rank_val)
+            drawdown_start_list.append(drawdown_start)
+            drawdown_end_list.append(drawdown_end)
+            drawdown_performance_list.append(drawdown_performance)
+            recovery_days_list.append(recovery_days)
+
+        except:
+            drawdown_start_list.append(None)
+            drawdown_end_list.append(None)
+            drawdown_performance_list.append(None)
+            recovery_days_list.append(None)
+
+    return drawdown_start_list, drawdown_end_list, \
+           drawdown_performance_list, recovery_days_list
+
+
+drawdown_start_list, drawdown_start_list, \
+drawdown_performance_list, recovery_days_list =case_iterator('SPY US', 'GTR',
+                     period_start= ['2020-12-31', '3M', '6M', '1Y', '3Y', '5Y', '10Y', '15Y', '30Y'],
+                     period_end=   [None, None, None, None, None, None, None, None, None],
+                     rank = [None, None, None, None, None, None, None, None, None])
+
+result  = historical_drawdowns('SPY US', 'GTR',
+                     period_start= ['2020-12-31', '3M', '6M', '1Y', '3Y', '5Y', '10Y', '15Y'],
+                     period_end=   [None, None, None, None, None, None, None, None],
+                     rank = [None, None, None, None, None, None, None, None])
+
+drawdown_start_list = [date.astype('M8[D]') for date in drawdown_start_list if date is not None]
