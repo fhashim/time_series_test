@@ -1,4 +1,5 @@
 """
+
 Calculate largest historic drawdowns and recovery period post a
 drawdown for a given portfolio
 (Can also be used on individual assets)
@@ -89,8 +90,12 @@ def parse_dates(period_start: str, period_end: str,
                 end_date = end_date - relativedelta(years=value)
         else:
             end_date = pd.Timestamp(parse(period_end, fuzzy=False))
-    except ValueError as error:
-        raise ValueError("Period End date is not correct") from error
+    # except ValueError as error:
+    #     raise ValueError("Period End date is not correct") from error
+    except:
+        start_date = 'Period End date is not correct'
+        end_date = 'Period End date is not correct'
+        return start_date, end_date
 
     # check if price on end date exists else use last available price
     if end_date in data_frame.Date.values:
@@ -118,8 +123,13 @@ def parse_dates(period_start: str, period_end: str,
                 start_date = start_date - relativedelta(years=value)
         else:
             start_date = pd.Timestamp(parse(period_start, fuzzy=False))
-    except ValueError as error:
-        raise ValueError("Period Start date is not correct") from error
+
+    except:
+        start_date = 'Period Start date is not correct'
+        end_date = 'Period Start date is not correct'
+        return start_date, end_date
+    # except ValueError as error:
+    #     raise ValueError("Period Start date is not correct") from error
 
     # check if price on start date exists else use previous available
     # price
@@ -129,10 +139,10 @@ def parse_dates(period_start: str, period_end: str,
     else:
         start_date = data_frame.loc[data_frame['Date']
                                     <= start_date, 'Date'].max()
+
         print(f"Period Start Date not found in date using last "
               f"available date i.e. {start_date}")
-    print(
-        "Start Date: {} and End Date: {}".format(start_date, end_date))
+
     return start_date, end_date
 
 
@@ -174,14 +184,12 @@ def read_data(code: str, price_type: str) -> pd.DataFrame:
     return data_frame
 
 
-def get_historical_drawdowns(code: str, price_type: str,
-                             period_start: Union[str, None],
+def get_historical_drawdowns(main_df: pd.DataFrame, period_start: Union[str, None],
                              period_end: Union[str, None],
                              rank: Union[int, None]) -> \
         Union[np.datetime64, float, int]:
     """
-    :param code: Asset Code str
-    :param price_type: Price Type str
+    :param main_df:
     :param period_start: Date str
     :param period_end: Date str
     :param rank: Rank of drawdown
@@ -192,9 +200,17 @@ def get_historical_drawdowns(code: str, price_type: str,
     period_end = 'Latest' if period_end is None else period_end
     rank = 1 if rank is None else rank
 
-    main_df = read_data(code, price_type)
+    # main_df = read_data(code, price_type)
     start_date, end_date = parse_dates(period_start, period_end,
                                        main_df)
+
+    if type(start_date) == str:
+        drawdown_start = start_date
+        drawdown_end = start_date
+        drawdown_performance = start_date
+        recovery_days = start_date
+
+        return drawdown_start, drawdown_end, drawdown_performance, recovery_days
 
     # Set date as df index
     main_df.set_index('Date', inplace=True)
@@ -219,7 +235,6 @@ def get_historical_drawdowns(code: str, price_type: str,
 
     # Returns df with cumulative maximum applied on Cum_Returns
     # along with Dates to find Date on which Previous Peak occurred.
-
     df_cum = pd.DataFrame(
         pd.concat([main_df.Cum_Returns, main_df.index.to_series()],
                   axis=1)
@@ -272,7 +287,6 @@ def get_historical_drawdowns(code: str, price_type: str,
                      rsuffix='_y')['Price_y'].values
 
     # Calculate recovery days in case data is NA Recovery_Days = -1
-
     main_df['Recovery_Days'] = np.where(
         pd.isna(main_df['Next_PP_index']),
         -1,
@@ -285,6 +299,9 @@ def get_historical_drawdowns(code: str, price_type: str,
     # Sort Values based on Drawdown to out desried rank
     main_df = main_df.sort_values('Drawdown').drop_duplicates(
         'Previous_Peak_index')
+
+    # Remove results where draw down in 0 or NaN
+    main_df = main_df[~(main_df.Drawdown >= 0) & ~(main_df.Drawdown.isna())]
 
     # Check if rank is within available limits else throw exception
     if rank <= main_df.shape[0]:
@@ -332,9 +349,10 @@ def historical_drawdowns(asset_code: str, price_type: str,
     return result_dict
 
 
-def case_iterator(asset_code, price_type, period_start, period_end,
+def case_iterator(asset_code: str, price_type: str, period_start, period_end,
                   rank):
     main_df = read_data(asset_code, price_type)
+
     drawdown_start_list = []
     drawdown_end_list = []
     drawdown_performance_list = []
@@ -343,8 +361,7 @@ def case_iterator(asset_code, price_type, period_start, period_end,
                                               rank):
         try:
             drawdown_start, drawdown_end, drawdown_performance, \
-            recovery_days = get_historical_drawdowns(asset_code,
-                                                     price_type,
+            recovery_days = get_historical_drawdowns(main_df,
                                                      start_date,
                                                      end_date,
                                                      rank_val)
@@ -369,9 +386,24 @@ drawdown_performance_list, recovery_days_list =case_iterator('SPY US', 'GTR',
                      period_end=   [None, None, None, None, None, None, None, None, None],
                      rank = [None, None, None, None, None, None, None, None, None])
 
+
+drawdown_start_list, drawdown_end_list, \
+drawdown_performance_list, recovery_days_list =case_iterator('SPY US', 'GTR',
+                     period_start= ['1M'],
+                     period_end=   [None],
+                     rank = [5])
+
 result  = historical_drawdowns('SPY US', 'GTR',
                      period_start= ['2020-12-31', '3M', '6M', '1Y', '3Y', '5Y', '10Y', '15Y'],
                      period_end=   [None, None, None, None, None, None, None, None],
                      rank = [None, None, None, None, None, None, None, None])
 
 drawdown_start_list = [date.astype('M8[D]') for date in drawdown_start_list if date is not None]
+
+test = [np.datetime64('2021-01-01'), None]
+
+conv_test = [date.astype('M8[D]') for date in test if date is not None]
+
+https: // funktion2.herokuapp.com / api / dynamic / historical_drawdowns?asset_code = SPY % 20U
+S & price_type = GTR & period_start = 1
+M & period_end = Latest & rank = 5
