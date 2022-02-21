@@ -325,7 +325,7 @@ def get_historical_drawdowns(main_df: pd.DataFrame,
         main_df = main_df.iloc[:rank, :][-1:]
     else:
         drawdown_start = drawdown_end = drawdown_performance = \
-            recovery_days = "ERROR: Required rank not found."
+            recovery_days = "ERROR: Required rank not found"
 
         return drawdown_start, drawdown_end, drawdown_performance, \
                recovery_days
