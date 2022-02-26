@@ -378,7 +378,7 @@ def historical_drawdowns(asset_code: str, price_type: str,
             drawdown_performance_list.append(drawdown_performance)
             recovery_days_list.append(recovery_days)
 
-        except ValueError:
+        except (Exception,):
             drawdown_start_list.append(None)
             drawdown_end_list.append(None)
             drawdown_performance_list.append(None)
