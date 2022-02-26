@@ -92,7 +92,7 @@ def parse_dates(period_start: str, period_end: Union[str, None],
         else:
             end_date = pd.Timestamp(parse(period_end, fuzzy=False))
 
-    except ValueError:
+    except (Exception,):
         start_date = 'ERROR: Period End date is not correct'
         end_date = 'ERROR: Period End date is not correct'
         return start_date, end_date
@@ -124,7 +124,7 @@ def parse_dates(period_start: str, period_end: Union[str, None],
         else:
             start_date = pd.Timestamp(parse(period_start, fuzzy=False))
 
-    except ValueError:
+    except (Exception,):
         start_date = 'ERROR: Period Start date is not correct'
         end_date = 'ERROR: Period Start date is not correct'
         return start_date, end_date
