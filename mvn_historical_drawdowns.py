@@ -98,13 +98,14 @@ def parse_dates(period_start: str, period_end: Union[str, None],
         return start_date, end_date
 
     # check if price on end date exists else use last available price
-    if end_date in data_frame.Date.values:
-        pass
-    else:
-        end_date = data_frame.loc[data_frame['Date'] <= end_date,
-                                  'Date'].max()
-        print(f"Period End Date not found in date using last "
-              f"available date i.e. {end_date}")
+    if end_date not in data_frame.Date.values:
+        if max(data_frame.Date.values) < end_date:
+            start_date = 'ERROR: No data found on or after end date'
+            end_date = 'ERROR: No data found on or after end date'
+            return start_date, end_date
+        else:
+            end_date = data_frame.loc[data_frame['Date'] <= end_date,
+                                      'Date'].max()
 
     # Parse and deal with Period Start Date
     try:
@@ -131,14 +132,9 @@ def parse_dates(period_start: str, period_end: Union[str, None],
 
     # check if price on start date exists else use previous available
     # price
-    if start_date in data_frame.Date.values:
-        pass
-    else:
+    if start_date not in data_frame.Date.values:
         start_date = data_frame.loc[data_frame['Date']
                                     <= start_date, 'Date'].max()
-
-        print(f"Period Start Date not found in date using last "
-              f"available date i.e. {start_date}")
 
     return start_date, end_date
 
@@ -200,7 +196,6 @@ def get_historical_drawdowns(main_df: pd.DataFrame,
         return drawdown_start, drawdown_end, \
                drawdown_performance, recovery_days
 
-
     # using defaults where passed value is none period_start =
     # 'Inception' if period_start is None else period_start
     period_end = 'Latest' if period_end is None else period_end
@@ -223,9 +218,9 @@ def get_historical_drawdowns(main_df: pd.DataFrame,
         return drawdown_start, drawdown_end, \
                drawdown_performance, recovery_days
 
-    if pd.isnull(end_date):
+    if isinstance(start_date, str):
         drawdown_start = drawdown_end = drawdown_performance = \
-            recovery_days = "ERROR: No data found prior end date"
+            recovery_days = end_date
         return drawdown_start, drawdown_end, \
                drawdown_performance, recovery_days
 
