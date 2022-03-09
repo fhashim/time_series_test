@@ -101,9 +101,9 @@ def get_historical_returns(main_df: pd.DataFrame,
         rate_of_return = (main_df.values[-1] / main_df.values[0]) - 1
         rate_of_return = (np.round(rate_of_return, 6))[0]
     else:
-        rate_of_return = (main_df.values[-1] / main_df.values[0]) ** \
-                         (comp_days / days_diff) - \
-                         (1 * (norm_days / comp_days))
+        rate_of_return = (((main_df.values[-1] / main_df.values[0]) **
+                          (comp_days / days_diff) - 1) *
+                          (norm_days / comp_days))
         rate_of_return = (np.round(rate_of_return, 6))[0]
 
     return rate_of_return
