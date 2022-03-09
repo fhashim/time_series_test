@@ -3,16 +3,16 @@ import re
 from typing import Union
 
 
-def parse_frequency(norm_freq: str, comp_freq: str) \
+def parse_frequency(norm_freq: Union[None, str],
+                    comp_freq: Union[None, str])\
         -> Union[float, str]:
-
     # allowed offsets D: Daily, M: Monthly, W: Weekly, Y: Yearly
     offset_chars = set('DWQMY')
 
     # Generate days for Normalisation Frequency
     try:
-        if norm_freq == 'NA':
-            norm_days = 'NA'
+        if norm_freq is None:
+            norm_days = None
         elif any((c in offset_chars) for c in norm_freq):
             value = int(re.findall(r'\d+', norm_freq)[0])
             if 'D' in norm_freq:
