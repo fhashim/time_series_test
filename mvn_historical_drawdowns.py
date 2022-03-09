@@ -214,7 +214,7 @@ def get_historical_drawdowns(main_df: pd.DataFrame,
 
     if pd.isnull(start_date):
         drawdown_start = drawdown_end = drawdown_performance = \
-            recovery_days = "ERROR: No data found prior start date"
+            recovery_days = "ERROR: No data found prior to start date"
         return drawdown_start, drawdown_end, \
                drawdown_performance, recovery_days
 
