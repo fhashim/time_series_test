@@ -64,3 +64,13 @@ results = historical_returns('SPY US', 'PR', None,
                              [None],
                              '10Y', '3Y'
                              )
+
+asset_code = 'SPY US'
+price_type = 'PR'
+period_start = '3Q'
+
+
+asset_code = 'SPY US'
+price_type = 'PR'
+period_start = '20Y'
+comp_freq = '2W'
