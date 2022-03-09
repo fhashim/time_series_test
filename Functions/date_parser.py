@@ -72,8 +72,8 @@ def parse_dates(period_start: str, period_end: Union[str, None],
                 start_date = start_date - relativedelta(weeks=value)
             elif 'M' in period_start:
                 start_date = start_date - relativedelta(months=value)
-            elif 'Q' in period_end:
-                end_date = end_date - relativedelta(months=3*value)
+            elif 'Q' in period_start:
+                start_date = start_date - relativedelta(months=3*value)
             else:
                 start_date = start_date - relativedelta(years=value)
         else:
