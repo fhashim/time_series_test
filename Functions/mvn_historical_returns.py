@@ -67,8 +67,7 @@ def get_historical_returns(main_df: pd.DataFrame,
 
     # using defaults where passed value is none
     period_end = 'Latest' if period_end is None else period_end
-    norm_freq = '1Y' if norm_freq is None else norm_freq
-    comp_freq = '1Y' if comp_freq is None else comp_freq
+    # comp_freq = '1Y' if comp_freq is None else comp_freq
 
     # Get parsed start and end dates
     start_date, end_date = parse_dates(period_start, period_end,
@@ -97,12 +96,12 @@ def get_historical_returns(main_df: pd.DataFrame,
     # days diff between start and end date
     days_diff = (end_date - start_date).days
 
-    if norm_freq == 'NA':
+    if norm_freq is None:
         rate_of_return = (main_df.values[-1] / main_df.values[0]) - 1
         rate_of_return = (np.round(rate_of_return, 6))[0]
     else:
         rate_of_return = (((main_df.values[-1] / main_df.values[0]) **
-                          (comp_days / days_diff) - 1) *
+                           (comp_days / days_diff) - 1) *
                           (norm_days / comp_days))
         rate_of_return = (np.round(rate_of_return, 6))[0]
 
@@ -111,8 +110,9 @@ def get_historical_returns(main_df: pd.DataFrame,
 
 def historical_returns(asset_code: str, price_type: str,
                        currency: str, period_start: list,
-                       period_end: list, normalisation_freq: str,
-                       compounding_freq: str
+                       period_end: list,
+                       normalisation_freq: Union[None, str] = '1Y',
+                       compounding_freq: str = '1Y'
                        ) -> dict:
     """
     :param currency:
