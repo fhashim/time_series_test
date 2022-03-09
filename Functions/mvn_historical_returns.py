@@ -79,7 +79,7 @@ def get_historical_returns(main_df: pd.DataFrame,
         return rate_of_return
 
     if pd.isnull(start_date):
-        rate_of_return = "ERROR: No data found prior start date"
+        rate_of_return = "ERROR: No data found prior to start date"
         return rate_of_return
 
     # Get parsed days for normalisation and compounding frequency
