@@ -218,12 +218,6 @@ def get_historical_drawdowns(main_df: pd.DataFrame,
         return drawdown_start, drawdown_end, \
                drawdown_performance, recovery_days
 
-    if isinstance(start_date, str):
-        drawdown_start = drawdown_end = drawdown_performance = \
-            recovery_days = end_date
-        return drawdown_start, drawdown_end, \
-               drawdown_performance, recovery_days
-
     # Set date as df index
     main_df = main_df.set_index('Date')
 
