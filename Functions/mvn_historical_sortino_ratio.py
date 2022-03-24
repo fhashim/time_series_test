@@ -54,7 +54,12 @@ def get_historical_sortino_ratio(main_df: pd.DataFrame,
         sortino_ratio, downside_volatility = None
         return sortino_ratio, rate_of_return, downside_volatility
 
+
     # Compute downside performance
+    # Filter data
+    main_df = main_df.set_index('Date')
+    main_df = main_df[(main_df.index >= start_date) &
+                      (main_df.index <= end_date)]
 
     # Order by date
     main_df = main_df.sort_values(by='Date')
@@ -80,11 +85,13 @@ def get_historical_sortino_ratio(main_df: pd.DataFrame,
     # Calculate volatility without Lambda
     else:
         main_df = main_df.sort_values(by='Date', ascending=False)
-        main_df['Weight'] = (1 - lambda_factor) * lambda_factor \
-                            ** np.arange(len(main_df))
+        main_df['Weight'] = (1 - lambda_factor) * lambda_factor ** \
+                            np.arange(len(main_df))
+
         downside_volatility = np.round(
             np.sqrt(
-                ((main_df['Weight'] * main_df['Performance'] ** 2).sum()
+                ((main_df['Weight'] * main_df[
+                    'Performance'] ** 2).sum()
                  * 252) / (main_df['Weight'].sum())
             ), 6
         )
@@ -171,3 +178,9 @@ def historical_sortino_ratio(maven_asset_code: str, price_type: str,
 # norm_freq = '1Y'
 # comp_freq = '1Y'
 # riskfree_rate = 0
+
+results = historical_sortino_ratio('SPY US', 'PR', None,['1Y','2W','6M','2Q','95D','Inception'],
+                                  [None, None, None, None, None, None],
+                                  lambda_factor = 0.9,
+                                  riskfree_rate=0.05
+                                  )
